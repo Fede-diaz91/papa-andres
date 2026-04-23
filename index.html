@@ -546,11 +546,8 @@ function apiGet(action, params) {
   return fetch(url).then(function(r){ return r.json(); });
 }
 function apiPost(action, data) {
-  return fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: action, data: data })
-  }).then(function(r){ return r.json(); });
+  var url = API_URL + '?action=' + action + '&data=' + encodeURIComponent(JSON.stringify(data));
+  return fetch(url).then(function(r){ return r.json(); });
 }
 
 // ============================================================
