@@ -34,7 +34,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
 .topbar-title{font-size:15px;font-weight:600;color:var(--verde)}
 .pill{font-size:11px;font-weight:500;padding:4px 14px;border-radius:20px}
 .pill-oliva{background:#e8f0c8;color:var(--oliva)}
-.main{margin-left:var(--sidebar-w);margin-top:var(--topbar-h);padding:24px;min-height:calc(100vh - var(--topbar-h))}
+.main{margin-left:var(--sidebar-w);margin-top:var(--topbar-h);padding:20px 28px;min-height:calc(100vh - var(--topbar-h))}
 .panel{display:none}.panel.active{display:block}
 .card{background:#fff;border-radius:12px;border:1px solid #e8d9b8;padding:20px 24px;margin-bottom:16px}
 .card-title{font-size:11px;font-weight:600;color:var(--verde);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1.5px solid #f0e4cc}
@@ -232,7 +232,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
 
   <!-- VENTAS -->
   <div id="panel-ventas" class="panel">
-    <div class="ventas-wrap">
+    <div class="ventas-wrap" style="max-width:1100px;margin:0 auto">
       <div class="card">
         <div class="card-title">Ventas — importar y analizar</div>
         <div class="mes-selector">
@@ -300,7 +300,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
 
   <!-- GASTOS -->
   <div id="panel-gastos" class="panel">
-    <div style="max-width:860px">
+    <div style="max-width:1100px;margin:0 auto">
       <div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap">
         <button class="gtab active" onclick="gTab('registrar',this)">📝 Registrar</button>
         <button class="gtab" onclick="gTab('historial',this)">📋 Historial</button>
@@ -607,12 +607,12 @@ var _plataformas = [];
 var _itemCount = 0;
 var gTipoActual = 'compra', gNatActual = 'variable', gInsumos = G_INSUMOS.slice(), gProveedores = [];
 var gTablaConfig = {
-  compras:{action:'compras',cols:['Fecha','Proveedor','Insumo','Unidad','Cantidad','PrecioUnit','Subtotal','IVA%','IVAMonto','MontoTotal','Comprobante']},
-  gastosFijos:{action:'gastosFijos',cols:['Fecha','Concepto','Categoría','Período','Monto','Proveedor']},
-  gastosVar:{action:'gastosVariables',cols:['Fecha','Concepto','Categoría','Monto','Proveedor']},
-  envios:{action:'envios',cols:['Fecha','Plataforma','Descripción','Monto']},
-  bienesDeUso:{action:'bienesDeUso',cols:['Fecha','Categoría','Descripción','Proveedor','Monto','VidaÚtilAnios']},
-  alquiler:{action:'alquiler',cols:['Fecha','Período','Monto']}
+  compras:     {action:'compras',       deleteAction:'eliminarCompra',       cols:['Fecha','Proveedor','Insumo','Unidad','Cantidad','PrecioUnit','Subtotal','IVA%','IVAMonto','MontoTotal','Comprobante']},
+  gastosFijos: {action:'gastosFijos',   deleteAction:'eliminarGastoFijo',    cols:['Fecha','Concepto','Categoría','Período','Monto','Proveedor']},
+  gastosVar:   {action:'gastosVariables',deleteAction:'eliminarGastoVariable',cols:['Fecha','Concepto','Categoría','Monto','Proveedor']},
+  envios:      {action:'envios',        deleteAction:'eliminarEnvio',        cols:['Fecha','Plataforma','Descripción','Monto']},
+  bienesDeUso: {action:'bienesDeUso',   deleteAction:'eliminarBienDeUso',    cols:['Fecha','Categoría','Descripción','Proveedor','Monto','VidaÚtilAnios']},
+  alquiler:    {action:'alquiler',      deleteAction:'eliminarAlquiler',     cols:['Fecha','Período','Monto']}
 };
 
 // ============================================================
@@ -1063,18 +1063,20 @@ function gFiltrarTablaLocal(){
 
 function gRenderTabla(cont,rows,cols,tipo){
   if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}
-  var puedeEliminar=tipo==='compras';
-  var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c+'</th>';}).join('')+(puedeEliminar?'<th></th>':'')+'</tr></thead><tbody>';
+  var cfg=gTablaConfig[tipo]||{};
+  var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
+    cols.map(function(c){return'<th>'+c+'</th>';}).join('')+
+    '<th style="width:44px"></th>'+
+    '</tr></thead><tbody>';
   rows.forEach(function(r,idx){
     html+='<tr>'+cols.map(function(c){
       var val=r[c]!=null?r[c]:'-';
       if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';
       return'<td>'+val+'</td>';
     }).join('');
-    if(puedeEliminar){
-      var rowIndex=r['_rowIndex']||0;
-      html+='<td><button onclick="gEliminarCompra('+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:12px" title="Eliminar">🗑</button></td>';
-    }
+    var rowIndex=r['_rowIndex']||0;
+    var deleteAction=cfg.deleteAction||'eliminarCompra';
+    html+='<td><button onclick="gEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td>';
     html+='</tr>';
   });
   html+='</tbody></table></div>';
@@ -1082,16 +1084,18 @@ function gRenderTabla(cont,rows,cols,tipo){
   cont.innerHTML=html;
 }
 
-function gEliminarCompra(rowIndex, idx){
+function gEliminarRegistro(deleteAction, rowIndex, idx){
   if(!confirm('¿Eliminar este registro?'))return;
-  apiPost('eliminarCompra',{rowIndex:rowIndex}).then(function(r){
+  apiPost(deleteAction,{rowIndex:rowIndex}).then(function(r){
     if(r.ok){
       toast('Eliminado ✓');
-      _gHistorialCache.splice(idx,1);
-      gFiltrarTablaLocal();
+      if(_gHistorialCache){_gHistorialCache.splice(idx,1);gFiltrarTablaLocal();}
     } else toast('Error al eliminar: '+(r.msg||''),false);
   });
 }
+
+// Alias para compatibilidad (ya no se usa directamente pero por las dudas)
+function gEliminarCompra(rowIndex,idx){ gEliminarRegistro('eliminarCompra',rowIndex,idx); }
 
 function gExportarHistorialExcel(){
   var rows=_gHistorialCache;
