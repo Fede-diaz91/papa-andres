@@ -205,7 +205,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     <div class="nav-section-label">Módulos</div>
     <div class="nav-item" onclick="nav('ventas',this)"><span class="ico">📈</span><span class="label">Ventas</span></div>
     <div class="nav-item" onclick="nav('gastos',this)"><span class="ico">🧾</span><span class="label">Compras y Gastos</span></div>
-    <div class="nav-item" onclick="nav('salarios',this)"><span class="ico">👷</span><span class="label">Salarios</span></div>
+    <div class="nav-item" onclick="nav('salarios',this)"><span class="ico">👷</span><span class="label">Salarios y Retiros</span></div>
     <div class="nav-item" onclick="nav('stock',this)"><span class="ico">📦</span><span class="label">Stock</span></div>
   </div>
   <div class="nav-section">
@@ -717,7 +717,7 @@ var DIAS_SEMANA = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 var COLORES = ['#233f20','#657a2d','#f4a21d','#d61220','#175ea5','#77060e'];
 var PANEL_TITLES = {
   dashboard:'Tablero de control', ventas:'Módulo de Ventas', gastos:'Compras y Gastos',
-  salarios:'Salarios', stock:'Stock', 'rep-resultados':'Estado de Resultados',
+  salarios:'Salarios y Retiros', stock:'Stock', 'rep-resultados':'Estado de Resultados',
   'rep-proveedores':'Mayor de Proveedores', 'rep-caja':'Caja y Bancos',
   'rep-equilibrio':'Punto de Equilibrio', 'rep-marginal':'Análisis Marginal', 'rep-stock':'Stock Permanente'
 };
@@ -1188,12 +1188,15 @@ function sCargarEmpleados() {
   apiGet('empleados').then(function(data){
     _sEmpleados = data||[];
     if(!_sEmpleados.length){ cont.innerHTML='<div class="loading">No hay empleados registrados.</div>'; return; }
-    var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Nombre</th><th>Apellido</th><th>DNI</th><th>Puesto</th><th>Ingreso</th><th>Estado</th><th style="width:80px"></th></tr></thead><tbody>';
+    var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Nombre</th><th>Apellido</th><th>DNI</th><th>Puesto</th><th>Ingreso</th><th>Estado</th><th style="width:120px"></th></tr></thead><tbody>';
     _sEmpleados.forEach(function(e){
       var activo = e.estado==='Activo';
       html+='<tr><td>'+e.nombre+'</td><td>'+e.apellido+'</td><td>'+(e.dni||'-')+'</td><td>'+(e.puesto||'-')+'</td><td>'+(e.fechaIngreso||'-')+'</td>'+
         '<td><span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+(activo?'#d1fae5':'#f5f5f5')+';color:'+(activo?'#065f46':'#8a7a5a')+'">'+e.estado+'</span></td>'+
-        '<td>'+(activo?'<button onclick="sBajaEmpleado(\''+e.id+'\',\''+e.nombre+' '+e.apellido+'\')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:11px">Baja</button>':'')+'</td></tr>';
+        '<td style="display:flex;gap:4px">'+
+          (activo?'<button onclick="sBajaEmpleado(\''+e.id+'\',\''+e.nombre+' '+e.apellido+'\')" style="background:#fff8e0;border:none;border-radius:5px;color:#92400e;cursor:pointer;padding:3px 8px;font-size:11px;font-weight:500">Baja</button>':'')+
+          '<button onclick="sEliminarEmpleado(\''+e.id+'\',\''+e.nombre+' '+e.apellido+'\')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button>'+
+        '</td></tr>';
     });
     html+='</tbody></table></div>';
     cont.innerHTML=html;
@@ -1226,10 +1229,18 @@ function sAltaEmpleado() {
 }
 
 function sBajaEmpleado(id, nombre) {
-  if(!confirm('¿Dar de baja a '+nombre+'?')) return;
+  if(!confirm('¿Dar de baja a '+nombre+'?\nEl empleado quedará como Inactivo.')) return;
   apiPost('bajaEmpleado',{id:id}).then(function(r){
     if(r.ok){ toast('Baja registrada ✓'); _sEmpleados=[]; sCargarEmpleados(); }
     else toast('Error',false);
+  });
+}
+
+function sEliminarEmpleado(id, nombre) {
+  if(!confirm('¿Eliminar a '+nombre+' del listado?\nEsta acción no se puede deshacer.')) return;
+  apiPost('eliminarEmpleado',{id:id}).then(function(r){
+    if(r.ok){ toast('Empleado eliminado ✓'); _sEmpleados=[]; sCargarEmpleados(); }
+    else toast('Error: '+(r.msg||''),false);
   });
 }
 
