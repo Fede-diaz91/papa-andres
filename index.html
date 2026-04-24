@@ -199,7 +199,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
   </div>
   <div class="nav-section">
     <div class="nav-section-label">Principal</div>
-    <div class="nav-item active" onclick="nav('dashboard',this)"><span class="ico">▦</span><span class="label">Dashboard</span></div>
+    <div class="nav-item active" onclick="nav('dashboard',this)"><span class="ico">▦</span><span class="label">Tablero de control</span></div>
   </div>
   <div class="nav-section">
     <div class="nav-section-label">Módulos</div>
@@ -221,7 +221,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
 </aside>
 
 <div class="topbar">
-  <div class="topbar-title" id="topbar-title">Dashboard general</div>
+  <div class="topbar-title" id="topbar-title">Tablero de control</div>
   <div class="topbar-right">
     <div class="pill pill-oliva" id="topbar-mes">Cargando...</div>
   </div>
@@ -442,6 +442,11 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <div><label class="form-label">Año</label><select id="h-anio" class="form-input"></select></div>
             <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="gCargarHistorial()">Filtrar</button>
           </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+            <div style="flex:1;min-width:160px"><label class="form-label">Buscar por concepto / insumo</label><input type="text" id="h-buscar-concepto" class="form-input" placeholder="Ej: HARINA, luz..." oninput="gFiltrarTablaLocal()"></div>
+            <div style="flex:1;min-width:140px"><label class="form-label">Proveedor</label><input type="text" id="h-buscar-prov" class="form-input" placeholder="Nombre proveedor" oninput="gFiltrarTablaLocal()"></div>
+            <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="gExportarHistorialExcel()">⬇ Excel</button>
+          </div>
           <div id="g-tabla-historial"><div class="loading">Seleccioná un tipo y filtrá.</div></div>
         </div>
       </div>
@@ -539,13 +544,28 @@ var API_URL = 'https://script.google.com/macros/s/AKfycbyDMdcXfDQtebAWObLdkAiStz
 // ============================================================
 // API HELPER
 // ============================================================
+// ============================================================
+// API HELPER con caché (TTL 60s para GETs)
+// ============================================================
+var _apiCache = {};
 function apiGet(action, params) {
   params = params || {};
   var url = API_URL + '?action=' + action;
   Object.keys(params).forEach(function(k){ url += '&' + k + '=' + encodeURIComponent(params[k]); });
-  return fetch(url).then(function(r){ return r.json(); });
+  var cacheKey = url;
+  var now = Date.now();
+  if (_apiCache[cacheKey] && (now - _apiCache[cacheKey].ts) < 60000) {
+    return Promise.resolve(_apiCache[cacheKey].data);
+  }
+  return fetch(url).then(function(r){ return r.json(); }).then(function(data){
+    _apiCache[cacheKey] = { data: data, ts: now };
+    return data;
+  });
 }
 function apiPost(action, data) {
+  // Los POSTs invalidan caché relacionada
+  var prefix = API_URL + '?action=' + action.replace(/registrar|agregar|eliminar|borrar/i,'');
+  Object.keys(_apiCache).forEach(function(k){ if(k.indexOf(API_URL)>=0) delete _apiCache[k]; });
   var url = API_URL + '?action=' + action + '&data=' + encodeURIComponent(JSON.stringify(data));
   return fetch(url).then(function(r){ return r.json(); });
 }
@@ -557,7 +577,7 @@ var MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto
 var DIAS_SEMANA = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 var COLORES = ['#233f20','#657a2d','#f4a21d','#d61220','#175ea5','#77060e'];
 var PANEL_TITLES = {
-  dashboard:'Dashboard general', ventas:'Módulo de Ventas', gastos:'Compras y Gastos',
+  dashboard:'Tablero de control', ventas:'Módulo de Ventas', gastos:'Compras y Gastos',
   salarios:'Salarios', stock:'Stock', 'rep-resultados':'Estado de Resultados',
   'rep-proveedores':'Mayor de Proveedores', 'rep-caja':'Caja y Bancos',
   'rep-equilibrio':'Punto de Equilibrio', 'rep-marginal':'Análisis Marginal', 'rep-stock':'Stock Permanente'
@@ -604,9 +624,13 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('topbar-mes').textContent = MESES[mesActivo]+' '+anioActivo;
   document.getElementById('v-mes').value  = mesActivo;
   document.getElementById('v-anio').value = anioActivo;
-  cargarDashboard();
-  cargarPlataformas();
+  // Pre-cargar en paralelo para reducir latencia percibida
+  Promise.all([
+    apiGet('plataformas').then(function(lista){ _plataformas=lista||[]; renderSelectPlataformas(); }).catch(function(){}),
+    apiGet('proveedores').then(function(data){ gProveedores=data||[]; gLlenarSelectsProveedores(); }).catch(function(){}),
+  ]);
   gInicializarGastos();
+  cargarDashboard();
 });
 
 // ============================================================
@@ -941,7 +965,8 @@ function gInicializarGastos() {
     else{for(var y=anioActual;y>=2026;y--){var opt=document.createElement('option');opt.value=y;opt.textContent=y;if(y===anioActual)opt.selected=true;el.appendChild(opt);}}
   });
   gLlenarInsumos();
-  apiGet('proveedores').then(function(data){gProveedores=data||[];gLlenarSelectsProveedores();}).catch(function(){});
+  if(gProveedores.length) gLlenarSelectsProveedores();
+  else apiGet('proveedores').then(function(data){gProveedores=data||[];gLlenarSelectsProveedores();}).catch(function(){});
 }
 
 function gTab(id,btn){['registrar','historial','proveedores','resumen'].forEach(function(t){document.getElementById('gtab-'+t).style.display=t===id?'':'none';});document.querySelectorAll('.gtab').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');if(id==='proveedores')apiGet('proveedores').then(function(data){gProveedores=data||[];gMostrarListaProveedores();});}
@@ -1006,9 +1031,91 @@ function gGuardarProv(){gSaveProveedor('g-np-nombre','g-np-contacto','g-np-telef
 function gGuardarProv2(){gSaveProveedor('g-pnp-nombre','g-pnp-contacto','g-pnp-telefono','g-pnp-cuit','g-panel-prov2');}
 function gSaveProveedor(nId,cId,tId,cuId,panelId){var nombre=document.getElementById(nId).value.trim();if(!nombre)return toast('El nombre es obligatorio',false);apiPost('agregarProveedor',{nombre:nombre,contacto:document.getElementById(cId).value,telefono:document.getElementById(tId).value,cuit:document.getElementById(cuId).value,notas:''}).then(function(){toast('Proveedor guardado ✓');document.getElementById(panelId).style.display='none';apiGet('proveedores').then(function(data){gProveedores=data||[];gLlenarSelectsProveedores();gMostrarListaProveedores();});});}
 
-function gCargarHistorial(){var tipo=document.getElementById('h-tipo').value;var mes=document.getElementById('h-mes').value;var anio=document.getElementById('h-anio').value;var cont=document.getElementById('g-tabla-historial');var cfg=gTablaConfig[tipo];cont.innerHTML='<div class="loading">Cargando...</div>';apiGet(cfg.action,{mes:mes,anio:anio}).then(function(rows){gRenderTabla(cont,rows,cfg.cols);}).catch(function(){cont.innerHTML='<div class="loading">Error al cargar.</div>';});}
+// Cache para historial (evita re-fetch al filtrar)
+var _gHistorialCache = null;
+var _gHistorialTipo = null;
 
-function gRenderTabla(cont,rows,cols){if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c+'</th>';}).join('')+'</tr></thead><tbody>';rows.forEach(function(r){html+='<tr>'+cols.map(function(c){var val=r[c]!=null?r[c]:'-';if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('')+'</tr>';});html+='</tbody></table></div>';cont.innerHTML=html;}
+function gCargarHistorial(){
+  var tipo=document.getElementById('h-tipo').value;
+  var mes=document.getElementById('h-mes').value;
+  var anio=document.getElementById('h-anio').value;
+  var cont=document.getElementById('g-tabla-historial');
+  var cfg=gTablaConfig[tipo];
+  _gHistorialCache=null; _gHistorialTipo=tipo;
+  cont.innerHTML='<div class="loading">Cargando...</div>';
+  apiGet(cfg.action,{mes:mes,anio:anio}).then(function(rows){
+    _gHistorialCache=rows||[];
+    gFiltrarTablaLocal();
+  }).catch(function(){cont.innerHTML='<div class="loading">Error al cargar.</div>';});
+}
+
+function gFiltrarTablaLocal(){
+  if(!_gHistorialCache)return;
+  var busqConc=(document.getElementById('h-buscar-concepto').value||'').toLowerCase().trim();
+  var busqProv=(document.getElementById('h-buscar-prov').value||'').toLowerCase().trim();
+  var filtradas=_gHistorialCache.filter(function(r){
+    var hayConc=!busqConc||Object.values(r).some(function(v){return String(v||'').toLowerCase().includes(busqConc);});
+    var hayProv=!busqProv||String(r['Proveedor']||'').toLowerCase().includes(busqProv);
+    return hayConc&&hayProv;
+  });
+  gRenderTabla(document.getElementById('g-tabla-historial'),filtradas,gTablaConfig[_gHistorialTipo].cols,_gHistorialTipo);
+}
+
+function gRenderTabla(cont,rows,cols,tipo){
+  if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}
+  var puedeEliminar=tipo==='compras';
+  var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c+'</th>';}).join('')+(puedeEliminar?'<th></th>':'')+'</tr></thead><tbody>';
+  rows.forEach(function(r,idx){
+    html+='<tr>'+cols.map(function(c){
+      var val=r[c]!=null?r[c]:'-';
+      if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';
+      return'<td>'+val+'</td>';
+    }).join('');
+    if(puedeEliminar){
+      var rowIndex=r['_rowIndex']||0;
+      html+='<td><button onclick="gEliminarCompra('+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:12px" title="Eliminar">🗑</button></td>';
+    }
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';
+  cont.innerHTML=html;
+}
+
+function gEliminarCompra(rowIndex, idx){
+  if(!confirm('¿Eliminar este registro?'))return;
+  apiPost('eliminarCompra',{rowIndex:rowIndex}).then(function(r){
+    if(r.ok){
+      toast('Eliminado ✓');
+      _gHistorialCache.splice(idx,1);
+      gFiltrarTablaLocal();
+    } else toast('Error al eliminar: '+(r.msg||''),false);
+  });
+}
+
+function gExportarHistorialExcel(){
+  var rows=_gHistorialCache;
+  if(!rows||!rows.length){toast('No hay datos para exportar',false);return;}
+  var busqConc=(document.getElementById('h-buscar-concepto').value||'').toLowerCase().trim();
+  var busqProv=(document.getElementById('h-buscar-prov').value||'').toLowerCase().trim();
+  if(busqConc||busqProv){
+    rows=rows.filter(function(r){
+      var hayConc=!busqConc||Object.values(r).some(function(v){return String(v||'').toLowerCase().includes(busqConc);});
+      var hayProv=!busqProv||String(r['Proveedor']||'').toLowerCase().includes(busqProv);
+      return hayConc&&hayProv;
+    });
+  }
+  var tipo=_gHistorialTipo||'registros';
+  var mes=document.getElementById('h-mes').value;
+  var anio=document.getElementById('h-anio').value;
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.json_to_sheet(rows);
+  var maxW=18;ws['!cols']=Object.keys(rows[0]||{}).map(function(){return{wch:maxW};});
+  XLSX.utils.book_append_sheet(wb,ws,'Historial');
+  var nombre='PapaAndres_'+tipo+'_'+(mes||'todo')+'_'+(anio||'')+'.xlsx';
+  XLSX.writeFile(wb,nombre);
+  toast('Excel descargado ✓');
+}
 
 function gCargarResumen(){var mes=document.getElementById('g-res-mes').value;var anio=document.getElementById('g-res-anio').value;var cont=document.getElementById('g-resumen-contenido');cont.innerHTML='<div class="loading">Cargando...</div>';apiGet('resumenMensual',{mes:mes,anio:anio}).then(function(r){var fmt=function(n){return '$\u00a0'+(n||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});};cont.innerHTML='<div class="resumen-egresos-grid"><div class="resumen-egr-item variable"><div class="resumen-egr-label">📦 Compras / Insumos</div><div class="resumen-egr-valor">'+fmt(r.compras)+'</div></div><div class="resumen-egr-item variable"><div class="resumen-egr-label">🧾 Gastos variables</div><div class="resumen-egr-valor">'+fmt(r.gastosVar)+'</div></div><div class="resumen-egr-item variable"><div class="resumen-egr-label">🚗 Envíos</div><div class="resumen-egr-valor">'+fmt(r.envios)+'</div></div><div class="resumen-egr-item fijo"><div class="resumen-egr-label">🧾 Gastos fijos</div><div class="resumen-egr-valor">'+fmt(r.gastosFijos)+'</div></div><div class="resumen-egr-item fijo"><div class="resumen-egr-label">🏭 Bienes de Uso</div><div class="resumen-egr-valor">'+fmt(r.bienesDeUso)+'</div></div><div class="resumen-egr-item fijo"><div class="resumen-egr-label">🏠 Alquiler</div><div class="resumen-egr-valor">'+fmt(r.alquiler)+'</div></div><div class="resumen-egr-item fijo"><div class="resumen-egr-label">👷 Salarios</div><div class="resumen-egr-valor">'+fmt(r.salarios)+'</div></div><div class="resumen-egr-item"><div class="resumen-egr-label">🤝 Retiros socios</div><div class="resumen-egr-valor">'+fmt(r.retiros)+'</div></div></div><div class="resumen-subtotal-row fijo"><span class="rs-label">🔵 Total Costos Fijos</span><span class="rs-valor">'+fmt(r.totalFijo)+'</span></div><div class="resumen-subtotal-row variable"><span class="rs-label">🟡 Total Costos Variables</span><span class="rs-valor">'+fmt(r.totalVariable)+'</span></div><div class="resumen-total-row"><span class="rt-label">TOTAL EGRESOS DEL PERÍODO</span><span class="rt-valor">'+fmt(r.total)+'</span></div>';}).catch(function(){cont.innerHTML='<div class="loading">Error al cargar.</div>';});}
 
