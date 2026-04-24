@@ -512,7 +512,110 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     </div>
   </div>
 
-  <div id="panel-salarios" class="panel"><div class="loading">Módulo de salarios — próximamente.</div></div>
+  <div id="panel-salarios" class="panel">
+    <div style="max-width:1100px;margin:0 auto">
+      <div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="gtab active" onclick="sTab('salario',this)">👷 Registrar salario</button>
+        <button class="gtab" onclick="sTab('retiro',this)">💸 Registrar retiro</button>
+        <button class="gtab" onclick="sTab('empleados',this)">👥 Empleados</button>
+        <button class="gtab" onclick="sTab('historial',this)">📋 Historial</button>
+      </div>
+
+      <!-- TAB: Registrar salario -->
+      <div id="stab-salario">
+        <div class="card">
+          <div class="card-title">Registrar liquidación de salario</div>
+          <div class="form-grid-2" style="margin-bottom:14px">
+            <div><label class="form-label">Fecha *</label><input type="date" id="s-fecha" class="form-input"></div>
+            <div><label class="form-label">Empleado *</label><select id="s-empleado" class="form-input"><option value="">Cargando...</option></select></div>
+            <div><label class="form-label">Período *</label><input type="text" id="s-periodo" class="form-input" placeholder="Ej: Abril 2026"></div>
+          </div>
+          <div class="card-title">Haberes y descuentos</div>
+          <div class="form-grid-3" style="background:#fdf8f0;border:1px solid #e8d9b8;border-radius:10px;padding:14px;margin-bottom:10px">
+            <div><label class="form-label">Sueldo bruto $</label><input type="number" id="s-bruto" class="form-input" min="0" step="0.01" placeholder="0,00" oninput="sCalcNeto()"></div>
+            <div><label class="form-label">Aporte patronal $</label><input type="number" id="s-patronal" class="form-input" min="0" step="0.01" placeholder="0,00"></div>
+            <div><label class="form-label">Retención empleado $</label><input type="number" id="s-retencion" class="form-input" min="0" step="0.01" placeholder="0,00" oninput="sCalcNeto()"></div>
+            <div><label class="form-label">ART $</label><input type="number" id="s-art" class="form-input" min="0" step="0.01" placeholder="0,00"></div>
+            <div><label class="form-label">Horas extra $</label><input type="number" id="s-extras" class="form-input" min="0" step="0.01" placeholder="0,00" oninput="sCalcNeto()"></div>
+            <div><label class="form-label">Presentismo $</label><input type="number" id="s-presentismo" class="form-input" min="0" step="0.01" placeholder="0,00" oninput="sCalcNeto()"></div>
+            <div style="grid-column:1/-1;border-top:1.5px solid #e8d9b8;padding-top:12px;margin-top:4px">
+              <label class="form-label" style="color:var(--verde);font-weight:600">Sueldo neto a pagar $</label>
+              <input type="number" id="s-neto" class="form-input" readonly placeholder="0,00" style="font-weight:700;font-size:16px;background:#f2f7e8;border-color:var(--oliva)">
+            </div>
+          </div>
+          <div><label class="form-label">Notas</label><textarea id="s-notas" class="form-input" rows="2" style="resize:vertical"></textarea></div>
+          <div style="margin-top:14px"><button class="btn btn-primary" onclick="sGuardarSalario()">Guardar liquidación</button></div>
+        </div>
+      </div>
+
+      <!-- TAB: Registrar retiro -->
+      <div id="stab-retiro" style="display:none">
+        <div class="card">
+          <div class="card-title">Registrar retiro de socio</div>
+          <div class="form-grid-2" style="margin-bottom:14px">
+            <div><label class="form-label">Fecha *</label><input type="date" id="r-fecha" class="form-input"></div>
+            <div><label class="form-label">Socio *</label>
+              <select id="r-socio" class="form-input">
+                <option value="Andrés">Andrés</option>
+                <option value="Lucho">Lucho</option>
+                <option value="Thomi">Thomi</option>
+                <option value="Alan">Alan</option>
+              </select>
+            </div>
+            <div><label class="form-label">Monto $</label><input type="number" id="r-monto" class="form-input" min="0" step="0.01" placeholder="0,00"></div>
+          </div>
+          <div><label class="form-label">Notas</label><textarea id="r-notas" class="form-input" rows="2" style="resize:vertical"></textarea></div>
+          <div style="margin-top:14px"><button class="btn btn-primary" onclick="sGuardarRetiro()">Guardar retiro</button></div>
+        </div>
+      </div>
+
+      <!-- TAB: Empleados -->
+      <div id="stab-empleados" style="display:none">
+        <div class="card">
+          <div class="card-title">Empleados</div>
+          <div id="s-lista-empleados"><div class="loading">Cargando...</div></div>
+          <div style="margin-top:16px"><button class="btn btn-secondary btn-sm" onclick="sToggleAltaEmpleado()">+ Alta de empleado</button></div>
+          <div id="s-panel-alta" style="display:none;margin-top:14px;background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:16px">
+            <div style="font-size:11px;font-weight:600;color:var(--verde);text-transform:uppercase;margin-bottom:12px">Nuevo empleado</div>
+            <div class="form-grid-2">
+              <div><label class="form-label">Nombre *</label><input type="text" id="e-nombre" class="form-input"></div>
+              <div><label class="form-label">Apellido *</label><input type="text" id="e-apellido" class="form-input"></div>
+              <div><label class="form-label">DNI</label><input type="text" id="e-dni" class="form-input"></div>
+              <div><label class="form-label">Puesto</label><input type="text" id="e-puesto" class="form-input" placeholder="Ej: Pizzero, Delivery"></div>
+              <div><label class="form-label">Fecha ingreso</label><input type="date" id="e-ingreso" class="form-input"></div>
+              <div><label class="form-label">Notas</label><input type="text" id="e-notas" class="form-input"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px">
+              <button class="btn btn-primary btn-sm" onclick="sAltaEmpleado()">Guardar</button>
+              <button class="btn btn-secondary btn-sm" onclick="sToggleAltaEmpleado()">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB: Historial -->
+      <div id="stab-historial" style="display:none">
+        <div class="card">
+          <div class="card-title">Historial de salarios y retiros</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+            <div><label class="form-label">Tipo</label>
+              <select id="sh-tipo" class="form-input">
+                <option value="salarios">👷 Salarios</option>
+                <option value="retiros">💸 Retiros de socios</option>
+              </select></div>
+            <div><label class="form-label">Mes</label><select id="sh-mes" class="form-input"></select></div>
+            <div><label class="form-label">Año</label><select id="sh-anio" class="form-input"></select></div>
+            <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="sCargarHistorial()">Filtrar</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+            <div style="flex:1;min-width:160px"><label class="form-label">Buscar</label><input type="text" id="sh-buscar" class="form-input" placeholder="Empleado, socio, período..." oninput="sFiltrarLocal()"></div>
+            <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="sExportarExcel()">⬇ Excel</button>
+          </div>
+          <div id="s-tabla-historial"><div class="loading">Seleccioná tipo y mes.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="panel-stock" class="panel"><div class="loading">Módulo de stock — próximamente.</div></div>
   <div id="panel-rep-resultados" class="panel"><div class="loading">Cargando reporte...</div></div>
   <div id="panel-rep-proveedores" class="panel"><div class="loading">Cargando reporte...</div></div>
@@ -679,6 +782,7 @@ function nav(id, btn) {
   btn.classList.add('active');
   document.getElementById('topbar-title').textContent = PANEL_TITLES[id]||'';
   if (id==='ventas') cargarModuloVentas();
+  if (id==='salarios') sInicializarModulo();
 }
 
 // ============================================================
@@ -988,8 +1092,229 @@ function guardarVentaManual(){
 }
 
 // ============================================================
-// MÓDULO GASTOS
+// MÓDULO SALARIOS Y RETIROS
 // ============================================================
+var _sEmpleados = [];
+var _sHistorialCache = null;
+var _sHistorialTipo = null;
+
+function sTab(id, btn) {
+  ['salario','retiro','empleados','historial'].forEach(function(t){ document.getElementById('stab-'+t).style.display = t===id?'':'none'; });
+  document.querySelectorAll('#panel-salarios .gtab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  if(id==='empleados') sCargarEmpleados();
+  if(id==='historial') sInicializarHistorial();
+  if(id==='salario') sCargarSelectEmpleados();
+}
+
+function sInicializarModulo() {
+  var hoy = new Date();
+  document.getElementById('s-fecha').value = hoy.toISOString().split('T')[0];
+  document.getElementById('r-fecha').value = hoy.toISOString().split('T')[0];
+  var periodoEl = document.getElementById('s-periodo');
+  if(periodoEl) periodoEl.value = MESES[hoy.getMonth()+1] + ' ' + hoy.getFullYear();
+  sCargarSelectEmpleados();
+}
+
+function sCargarSelectEmpleados() {
+  if(_sEmpleados.length){ sLlenarSelectEmpleados(); return; }
+  apiGet('empleados').then(function(data){
+    _sEmpleados = (data||[]).filter(function(e){ return e.estado === 'Activo'; });
+    sLlenarSelectEmpleados();
+  });
+}
+
+function sLlenarSelectEmpleados() {
+  var sel = document.getElementById('s-empleado'); if(!sel) return;
+  sel.innerHTML = '<option value="">Seleccioná empleado...</option>';
+  _sEmpleados.forEach(function(e){
+    sel.appendChild(new Option(e.nombre + ' ' + e.apellido, e.nombre + ' ' + e.apellido));
+  });
+}
+
+function sCalcNeto() {
+  var bruto  = parseFloat(document.getElementById('s-bruto').value)||0;
+  var reten  = parseFloat(document.getElementById('s-retencion').value)||0;
+  var extras = parseFloat(document.getElementById('s-extras').value)||0;
+  var pres   = parseFloat(document.getElementById('s-presentismo').value)||0;
+  document.getElementById('s-neto').value = (bruto - reten + extras + pres).toFixed(2);
+}
+
+function sGuardarSalario() {
+  var fecha    = document.getElementById('s-fecha').value;
+  var empleado = document.getElementById('s-empleado').value;
+  var periodo  = document.getElementById('s-periodo').value;
+  var bruto    = document.getElementById('s-bruto').value;
+  if(!fecha||!empleado||!periodo||!bruto) return toast('Completá fecha, empleado, período y sueldo bruto',false);
+  apiPost('registrarSalario',{
+    fecha:fecha, empleado:empleado, periodo:periodo,
+    sueldoBruto:bruto,
+    aportePatronal:document.getElementById('s-patronal').value||0,
+    retencionEmpleado:document.getElementById('s-retencion').value||0,
+    art:document.getElementById('s-art').value||0,
+    horasExtra:document.getElementById('s-extras').value||0,
+    presentismo:document.getElementById('s-presentismo').value||0,
+    notas:document.getElementById('s-notas').value
+  }).then(function(r){
+    if(r.ok){ toast('Salario registrado ✓'); sLimpiarSalario(); }
+    else toast('Error al guardar',false);
+  });
+}
+
+function sLimpiarSalario() {
+  ['s-bruto','s-patronal','s-retencion','s-art','s-extras','s-presentismo','s-neto','s-notas'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('s-empleado').value='';
+}
+
+function sGuardarRetiro() {
+  var fecha = document.getElementById('r-fecha').value;
+  var socio = document.getElementById('r-socio').value;
+  var monto = document.getElementById('r-monto').value;
+  if(!fecha||!socio||!monto) return toast('Completá todos los campos',false);
+  apiPost('registrarRetiro',{
+    fecha:fecha, socio:socio, monto:monto, notas:document.getElementById('r-notas').value
+  }).then(function(r){
+    if(r.ok){ toast('Retiro registrado ✓'); document.getElementById('r-monto').value=''; document.getElementById('r-notas').value=''; }
+    else toast('Error al guardar',false);
+  });
+}
+
+// --- Empleados ---
+function sCargarEmpleados() {
+  var cont = document.getElementById('s-lista-empleados');
+  cont.innerHTML = '<div class="loading">Cargando...</div>';
+  apiGet('empleados').then(function(data){
+    _sEmpleados = data||[];
+    if(!_sEmpleados.length){ cont.innerHTML='<div class="loading">No hay empleados registrados.</div>'; return; }
+    var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Nombre</th><th>Apellido</th><th>DNI</th><th>Puesto</th><th>Ingreso</th><th>Estado</th><th style="width:80px"></th></tr></thead><tbody>';
+    _sEmpleados.forEach(function(e){
+      var activo = e.estado==='Activo';
+      html+='<tr><td>'+e.nombre+'</td><td>'+e.apellido+'</td><td>'+(e.dni||'-')+'</td><td>'+(e.puesto||'-')+'</td><td>'+(e.fechaIngreso||'-')+'</td>'+
+        '<td><span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500;background:'+(activo?'#d1fae5':'#f5f5f5')+';color:'+(activo?'#065f46':'#8a7a5a')+'">'+e.estado+'</span></td>'+
+        '<td>'+(activo?'<button onclick="sBajaEmpleado(\''+e.id+'\',\''+e.nombre+' '+e.apellido+'\')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:11px">Baja</button>':'')+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+    cont.innerHTML=html;
+  });
+}
+
+function sToggleAltaEmpleado() {
+  var p=document.getElementById('s-panel-alta'); p.style.display=p.style.display==='none'?'block':'none';
+}
+
+function sAltaEmpleado() {
+  var nombre=document.getElementById('e-nombre').value.trim();
+  var apellido=document.getElementById('e-apellido').value.trim();
+  if(!nombre||!apellido) return toast('Nombre y apellido son obligatorios',false);
+  apiPost('altaEmpleado',{
+    nombre:nombre, apellido:apellido,
+    dni:document.getElementById('e-dni').value,
+    puesto:document.getElementById('e-puesto').value,
+    fechaIngreso:document.getElementById('e-ingreso').value,
+    notas:document.getElementById('e-notas').value
+  }).then(function(r){
+    if(r.ok){
+      toast('Empleado dado de alta ✓');
+      document.getElementById('s-panel-alta').style.display='none';
+      ['e-nombre','e-apellido','e-dni','e-puesto','e-ingreso','e-notas'].forEach(function(id){ document.getElementById(id).value=''; });
+      _sEmpleados=[];
+      sCargarEmpleados();
+    } else toast('Error',false);
+  });
+}
+
+function sBajaEmpleado(id, nombre) {
+  if(!confirm('¿Dar de baja a '+nombre+'?')) return;
+  apiPost('bajaEmpleado',{id:id}).then(function(r){
+    if(r.ok){ toast('Baja registrada ✓'); _sEmpleados=[]; sCargarEmpleados(); }
+    else toast('Error',false);
+  });
+}
+
+// --- Historial ---
+function sInicializarHistorial() {
+  var hoy=new Date(), mesActual=hoy.getMonth()+1, anioActual=hoy.getFullYear();
+  ['sh-mes','sh-anio'].forEach(function(id){
+    var el=document.getElementById(id); if(!el) return;
+    var isMes=id.includes('mes');
+    el.innerHTML='<option value="">Todos</option>';
+    if(isMes){ MESES.slice(1).forEach(function(m,i){ var opt=document.createElement('option'); opt.value=i+1; opt.textContent=m; if(i+1===mesActual)opt.selected=true; el.appendChild(opt); }); }
+    else{ for(var y=anioActual;y>=2026;y--){ var opt=document.createElement('option'); opt.value=y; opt.textContent=y; if(y===anioActual)opt.selected=true; el.appendChild(opt); } }
+  });
+}
+
+function sCargarHistorial() {
+  var tipo=document.getElementById('sh-tipo').value;
+  var mes=document.getElementById('sh-mes').value;
+  var anio=document.getElementById('sh-anio').value;
+  var cont=document.getElementById('s-tabla-historial');
+  _sHistorialCache=null; _sHistorialTipo=tipo;
+  cont.innerHTML='<div class="loading">Cargando...</div>';
+  apiGet(tipo,{mes:mes,anio:anio}).then(function(rows){
+    _sHistorialCache=rows||[];
+    sFiltrarLocal();
+  }).catch(function(){ cont.innerHTML='<div class="loading">Error al cargar.</div>'; });
+}
+
+function sFiltrarLocal() {
+  if(!_sHistorialCache)return;
+  var busq=(document.getElementById('sh-buscar').value||'').toLowerCase().trim();
+  var filtradas=_sHistorialCache.filter(function(r){
+    return !busq||Object.values(r).some(function(v){return String(v||'').toLowerCase().includes(busq);});
+  });
+  sRenderTabla(filtradas, _sHistorialTipo);
+}
+
+function sRenderTabla(rows, tipo) {
+  var cont=document.getElementById('s-tabla-historial');
+  if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}
+  var cols = tipo==='salarios'
+    ? ['Fecha','Empleado','Período','SueldoBruto','AportePatronal','RetencionEmpleado','ART','HorasExtra','Presentismo','SueldoNeto']
+    : ['Fecha','Socio','Monto','Notas'];
+  var deleteAction = tipo==='salarios' ? 'eliminarSalario' : 'eliminarRetiro';
+  var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
+    cols.map(function(c){return'<th>'+c+'</th>';}).join('')+
+    '<th style="width:44px"></th></tr></thead><tbody>';
+  rows.forEach(function(r,idx){
+    html+='<tr>'+cols.map(function(c){
+      var val=r[c]!=null?r[c]:'-';
+      if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';
+      return'<td>'+val+'</td>';
+    }).join('');
+    var rowIndex=r['_rowIndex']||0;
+    html+='<td><button onclick="sEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td>';
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';
+  cont.innerHTML=html;
+}
+
+function sEliminarRegistro(deleteAction, rowIndex, idx) {
+  if(!confirm('¿Eliminar este registro?'))return;
+  apiPost(deleteAction,{rowIndex:rowIndex}).then(function(r){
+    if(r.ok){ toast('Eliminado ✓'); sCargarHistorial(); }
+    else toast('Error: '+(r.msg||''),false);
+  });
+}
+
+function sExportarExcel() {
+  var rows=_sHistorialCache;
+  if(!rows||!rows.length){toast('No hay datos para exportar',false);return;}
+  var busq=(document.getElementById('sh-buscar').value||'').toLowerCase().trim();
+  if(busq) rows=rows.filter(function(r){return Object.values(r).some(function(v){return String(v||'').toLowerCase().includes(busq);});});
+  var exportRows=rows.map(function(r){var o={};Object.keys(r).filter(function(k){return k!=='_rowIndex';}).forEach(function(k){o[k]=r[k];});return o;});
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.json_to_sheet(exportRows);
+  XLSX.utils.book_append_sheet(wb,ws,'Historial');
+  var mes=document.getElementById('sh-mes').value, anio=document.getElementById('sh-anio').value;
+  XLSX.writeFile(wb,'PapaAndres_'+(_sHistorialTipo||'salarios')+'_'+(mes||'todo')+'_'+(anio||'')+'.xlsx');
+  toast('Excel descargado ✓');
+}
+
+
 function gInicializarGastos() {
   var hoy=new Date();var mesActual=hoy.getMonth()+1;var anioActual=hoy.getFullYear();
   var gFecha=document.getElementById('g-fecha');if(gFecha)gFecha.value=hoy.toISOString().split('T')[0];
