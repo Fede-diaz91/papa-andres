@@ -1080,9 +1080,12 @@ function gEliminarProveedor(id, nombre, idx){
   apiPost('eliminarProveedor',{id:id}).then(function(r){
     if(r.ok){
       toast('Proveedor eliminado ✓');
-      gProveedores.splice(idx,1);
-      gMostrarListaProveedores();
-      gLlenarSelectsProveedores();
+      // Recargar lista fresca del servidor
+      apiGet('proveedores').then(function(data){
+        gProveedores=data||[];
+        gMostrarListaProveedores();
+        gLlenarSelectsProveedores();
+      });
     } else toast('Error: '+(r.msg||''),false);
   });
 }
@@ -1148,7 +1151,8 @@ function gEliminarRegistro(deleteAction, rowIndex, idx){
   apiPost(deleteAction,{rowIndex:rowIndex}).then(function(r){
     if(r.ok){
       toast('Eliminado ✓');
-      if(_gHistorialCache){_gHistorialCache.splice(idx,1);gFiltrarTablaLocal();}
+      // Re-fetch limpio del servidor (caché ya fue vaciado por apiPost)
+      gCargarHistorial();
     } else toast('Error al eliminar: '+(r.msg||''),false);
   });
 }
@@ -1260,7 +1264,7 @@ function vEliminarRegistro(deleteAction, rowIndex, idx) {
   apiPost(deleteAction, {rowIndex:rowIndex}).then(function(r){
     if(r.ok){
       toast('Eliminado ✓');
-      if(_vHistorialCache){ _vHistorialCache.splice(idx,1); vFiltrarLocal(); }
+      vCargarHistorial();
     } else toast('Error: '+(r.msg||''), false);
   });
 }
