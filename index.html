@@ -585,19 +585,25 @@ function apiGet(action, params) {
   Object.keys(params).forEach(function(k){ url += '&' + k + '=' + encodeURIComponent(params[k]); });
   var cacheKey = url;
   var now = Date.now();
-  if (_apiCache[cacheKey] && (now - _apiCache[cacheKey].ts) < 60000) {
-    return Promise.resolve(_apiCache[cacheKey].data);
+  if (_apiCache[cacheKey] && (now - _apiCache[cacheKey].ts) < 55000) {
+    return Promise.resolve(JSON.parse(JSON.stringify(_apiCache[cacheKey].data)));
   }
-  return fetch(url).then(function(r){ return r.json(); }).then(function(data){
+  // Cache-busting: evita que Google/CDN devuelva respuesta cacheada
+  var fetchUrl = url + '&_t=' + now;
+  return fetch(fetchUrl).then(function(r){ return r.json(); }).then(function(data){
     _apiCache[cacheKey] = { data: data, ts: now };
     return data;
   });
 }
 function apiPost(action, data) {
-  // Invalidar TODO el caché en cualquier POST (escritura/borrado)
+  // Limpiar TODO el caché en cualquier escritura
   _apiCache = {};
-  var url = API_URL + '?action=' + action + '&data=' + encodeURIComponent(JSON.stringify(data));
-  return fetch(url).then(function(r){ return r.json(); });
+  // Apps Script doPost lee e.postData.contents — hay que mandar un POST real con body JSON
+  return fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, // text/plain evita preflight CORS en Apps Script
+    body: JSON.stringify({ action: action, data: data })
+  }).then(function(r){ return r.json(); });
 }
 
 // ============================================================
@@ -1056,7 +1062,30 @@ function gGuardar(){
 function gLimpiarForm(){var hoy=new Date().toISOString().split('T')[0];document.getElementById('g-fecha').value=hoy;['g-insumo','g-unidad','g-comprobante','g-concepto','g-cat-gasto','g-periodo-gasto','g-monto-gasto','g-plataforma','g-desc-envio','g-monto-envio','g-cat-bien','g-desc-bien','g-monto-bien','g-periodo-alq','g-monto-alq','g-notas','g-cantidad','g-precio-unit','g-insumo-otro','g-subtotal','g-iva-monto','g-perc-iva','g-perc-iibb','g-perc-gan','g-total-pagar'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});var ivaEl=document.getElementById('g-iva');if(ivaEl)ivaEl.value='21';document.getElementById('g-vida-util-info').style.display='none';if(gTipoActual==='gasto'){document.querySelectorAll('.nat-sel-btn').forEach(function(b){b.classList.remove('active');});gNatActual=null;}}
 
 function gLlenarSelectsProveedores(){var sel=document.getElementById('g-proveedor');if(!sel)return;sel.innerHTML='<option value="">Sin proveedor</option>';gProveedores.forEach(function(p){sel.appendChild(new Option(p.nombre,p.nombre));});}
-function gMostrarListaProveedores(){var cont=document.getElementById('g-lista-proveedores');if(!cont)return;if(!gProveedores.length){cont.innerHTML='<div class="loading">No hay proveedores.</div>';return;}var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>CUIT</th></tr></thead><tbody>';gProveedores.forEach(function(p){html+='<tr><td>'+p.nombre+'</td><td>'+(p.contacto||'-')+'</td><td>'+(p.telefono||'-')+'</td><td>'+(p.cuit||'-')+'</td></tr>';});html+='</tbody></table></div>';cont.innerHTML=html;}
+function gMostrarListaProveedores(){
+  var cont=document.getElementById('g-lista-proveedores');
+  if(!cont)return;
+  if(!gProveedores.length){cont.innerHTML='<div class="loading">No hay proveedores.</div>';return;}
+  var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Nombre</th><th>Contacto</th><th>Teléfono</th><th>CUIT</th><th style="width:44px"></th></tr></thead><tbody>';
+  gProveedores.forEach(function(p,idx){
+    html+='<tr><td>'+p.nombre+'</td><td>'+(p.contacto||'-')+'</td><td>'+(p.telefono||'-')+'</td><td>'+(p.cuit||'-')+'</td>'+
+      '<td><button onclick="gEliminarProveedor(\''+p.id+'\',\''+p.nombre+'\','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';
+  });
+  html+='</tbody></table></div>';
+  cont.innerHTML=html;
+}
+
+function gEliminarProveedor(id, nombre, idx){
+  if(!confirm('¿Eliminar el proveedor "'+nombre+'"?\nSe quitará del listado pero no afecta registros ya guardados.'))return;
+  apiPost('eliminarProveedor',{id:id}).then(function(r){
+    if(r.ok){
+      toast('Proveedor eliminado ✓');
+      gProveedores.splice(idx,1);
+      gMostrarListaProveedores();
+      gLlenarSelectsProveedores();
+    } else toast('Error: '+(r.msg||''),false);
+  });
+}
 function gGuardarProv(){gSaveProveedor('g-np-nombre','g-np-contacto','g-np-telefono','g-np-cuit','g-panel-prov');}
 function gGuardarProv2(){gSaveProveedor('g-pnp-nombre','g-pnp-contacto','g-pnp-telefono','g-pnp-cuit','g-panel-prov2');}
 function gSaveProveedor(nId,cId,tId,cuId,panelId){var nombre=document.getElementById(nId).value.trim();if(!nombre)return toast('El nombre es obligatorio',false);apiPost('agregarProveedor',{nombre:nombre,contacto:document.getElementById(cId).value,telefono:document.getElementById(tId).value,cuit:document.getElementById(cuId).value,notas:''}).then(function(){toast('Proveedor guardado ✓');document.getElementById(panelId).style.display='none';apiGet('proveedores').then(function(data){gProveedores=data||[];gLlenarSelectsProveedores();gMostrarListaProveedores();});});}
