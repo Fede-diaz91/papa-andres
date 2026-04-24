@@ -233,68 +233,99 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
   <!-- VENTAS -->
   <div id="panel-ventas" class="panel">
     <div class="ventas-wrap" style="max-width:1100px;margin:0 auto">
-      <div class="card">
-        <div class="card-title">Ventas — importar y analizar</div>
-        <div class="mes-selector">
-          <label>Mes</label>
-          <select id="v-mes" onchange="onCambiarMesVentas()">
-            <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
-            <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
-            <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
-          </select>
-          <label style="margin-left:12px">Año</label>
-          <select id="v-anio" onchange="onCambiarMesVentas()"><option value="2026">2026</option><option value="2027">2027</option></select>
+      <!-- Pestañas ventas -->
+      <div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="gtab active" onclick="vTab('importar',this)">📈 Importar y analizar</button>
+        <button class="gtab" onclick="vTab('historial',this)">📋 Historial de ventas</button>
+      </div>
+
+      <!-- TAB: Importar -->
+      <div id="vtab-importar">
+        <div class="card">
+          <div class="card-title">Ventas — importar y analizar</div>
+          <div class="mes-selector">
+            <label>Mes</label>
+            <select id="v-mes" onchange="onCambiarMesVentas()">
+              <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+              <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+              <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+            </select>
+            <label style="margin-left:12px">Año</label>
+            <select id="v-anio" onchange="onCambiarMesVentas()"><option value="2026">2026</option><option value="2027">2027</option></select>
+          </div>
+          <div class="imported-banner" id="imported-banner" style="display:none">
+            <span class="imported-banner-text" id="imported-banner-text"></span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-secondary btn-sm" onclick="exportarExcel()">⬇ Exportar Excel</button>
+              <button class="btn btn-secondary btn-sm" onclick="abrirCargaManual()">+ Carga manual</button>
+              <button class="btn btn-danger btn-sm" onclick="borrarMes()">🗑 Borrar y reimportar</button>
+            </div>
+          </div>
+          <div id="upload-section">
+            <div class="upload-grid">
+              <div class="upload-box" id="box-dia" ondragover="dragOver(event,'box-dia')" ondragleave="dragLeave('box-dia')" ondrop="dropFile(event,'dia')">
+                <span class="upload-icon" id="icon-dia">📅</span>
+                <div class="upload-title">Ventas por día</div>
+                <div class="upload-sub">Canal y método de pago<br>.xlsx o .csv</div>
+                <button class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('file-dia').click()">Seleccionar archivo</button>
+                <input type="file" id="file-dia" accept=".xlsx,.csv" style="display:none" onchange="cargarArchivo(this,'dia')">
+                <div class="upload-filename" id="fname-dia"></div>
+                <div class="upload-clear" id="clear-dia" style="display:none" onclick="limpiarArchivo('dia')">✕ Quitar</div>
+              </div>
+              <div class="upload-box" id="box-prod" ondragover="dragOver(event,'box-prod')" ondragleave="dragLeave('box-prod')" ondrop="dropFile(event,'prod')">
+                <span class="upload-icon" id="icon-prod">🍕</span>
+                <div class="upload-title">Ventas por producto</div>
+                <div class="upload-sub">Cantidad y subtotal por ítem<br>.xlsx o .csv</div>
+                <button class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('file-prod').click()">Seleccionar archivo</button>
+                <input type="file" id="file-prod" accept=".xlsx,.csv" style="display:none" onchange="cargarArchivo(this,'prod')">
+                <div class="upload-filename" id="fname-prod"></div>
+                <div class="upload-clear" id="clear-prod" style="display:none" onclick="limpiarArchivo('prod')">✕ Quitar</div>
+              </div>
+            </div>
+            <div class="resumen-pre" id="resumen-pre">
+              <div class="resumen-pre-title">Vista previa — listo para importar</div>
+              <div class="resumen-pre-grid">
+                <div class="resumen-pre-item"><div class="resumen-pre-label">Días con ventas</div><div class="resumen-pre-value" id="pre-dias">—</div></div>
+                <div class="resumen-pre-item"><div class="resumen-pre-label">Total pedidos</div><div class="resumen-pre-value" id="pre-pedidos">—</div></div>
+                <div class="resumen-pre-item"><div class="resumen-pre-label">Ventas brutas</div><div class="resumen-pre-value" id="pre-total">—</div></div>
+                <div class="resumen-pre-item"><div class="resumen-pre-label">Productos distintos</div><div class="resumen-pre-value" id="pre-productos">—</div></div>
+              </div>
+            </div>
+            <div class="progress-bar-wrap" id="progress-wrap">
+              <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill"></div></div>
+              <div class="progress-label" id="progress-label">Procesando...</div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
+              <button class="btn btn-primary" id="btn-importar" type="button" onclick="importar()" disabled>↑ Importar ventas</button>
+              <button class="btn btn-secondary" type="button" onclick="abrirCargaManual()">+ Carga manual</button>
+              <span id="importar-status" style="font-size:12px;color:#8a7a5a"></span>
+            </div>
+          </div>
         </div>
-        <div class="imported-banner" id="imported-banner" style="display:none">
-          <span class="imported-banner-text" id="imported-banner-text"></span>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-secondary btn-sm" onclick="exportarExcel()">⬇ Exportar Excel</button>
-            <button class="btn btn-secondary btn-sm" onclick="abrirCargaManual()">+ Carga manual</button>
-            <button class="btn btn-danger btn-sm" onclick="borrarMes()">🗑 Borrar y reimportar</button>
+        <div id="ventas-reportes"></div>
+      </div>
+
+      <!-- TAB: Historial de ventas -->
+      <div id="vtab-historial" style="display:none">
+        <div class="card">
+          <div class="card-title">Historial de ventas</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+            <div><label class="form-label">Tipo</label>
+              <select id="vh-tipo" class="form-input" style="min-width:160px">
+                <option value="ventasDia">📅 Ventas por día</option>
+                <option value="ventasProductos">🍕 Ventas por producto</option>
+              </select></div>
+            <div><label class="form-label">Mes</label><select id="vh-mes" class="form-input"></select></div>
+            <div><label class="form-label">Año</label><select id="vh-anio" class="form-input"></select></div>
+            <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="vCargarHistorial()">Filtrar</button>
           </div>
-        </div>
-        <div id="upload-section">
-          <div class="upload-grid">
-            <div class="upload-box" id="box-dia" ondragover="dragOver(event,'box-dia')" ondragleave="dragLeave('box-dia')" ondrop="dropFile(event,'dia')">
-              <span class="upload-icon" id="icon-dia">📅</span>
-              <div class="upload-title">Ventas por día</div>
-              <div class="upload-sub">Canal y método de pago<br>.xlsx o .csv</div>
-              <button class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('file-dia').click()">Seleccionar archivo</button>
-              <input type="file" id="file-dia" accept=".xlsx,.csv" style="display:none" onchange="cargarArchivo(this,'dia')">
-              <div class="upload-filename" id="fname-dia"></div>
-              <div class="upload-clear" id="clear-dia" style="display:none" onclick="limpiarArchivo('dia')">✕ Quitar</div>
-            </div>
-            <div class="upload-box" id="box-prod" ondragover="dragOver(event,'box-prod')" ondragleave="dragLeave('box-prod')" ondrop="dropFile(event,'prod')">
-              <span class="upload-icon" id="icon-prod">🍕</span>
-              <div class="upload-title">Ventas por producto</div>
-              <div class="upload-sub">Cantidad y subtotal por ítem<br>.xlsx o .csv</div>
-              <button class="btn btn-secondary btn-sm" type="button" onclick="document.getElementById('file-prod').click()">Seleccionar archivo</button>
-              <input type="file" id="file-prod" accept=".xlsx,.csv" style="display:none" onchange="cargarArchivo(this,'prod')">
-              <div class="upload-filename" id="fname-prod"></div>
-              <div class="upload-clear" id="clear-prod" style="display:none" onclick="limpiarArchivo('prod')">✕ Quitar</div>
-            </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+            <div style="flex:1;min-width:160px"><label class="form-label">Buscar</label><input type="text" id="vh-buscar" class="form-input" placeholder="Canal, producto, método..." oninput="vFiltrarLocal()"></div>
+            <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="vExportarExcel()">⬇ Excel</button>
           </div>
-          <div class="resumen-pre" id="resumen-pre">
-            <div class="resumen-pre-title">Vista previa — listo para importar</div>
-            <div class="resumen-pre-grid">
-              <div class="resumen-pre-item"><div class="resumen-pre-label">Días con ventas</div><div class="resumen-pre-value" id="pre-dias">—</div></div>
-              <div class="resumen-pre-item"><div class="resumen-pre-label">Total pedidos</div><div class="resumen-pre-value" id="pre-pedidos">—</div></div>
-              <div class="resumen-pre-item"><div class="resumen-pre-label">Ventas brutas</div><div class="resumen-pre-value" id="pre-total">—</div></div>
-              <div class="resumen-pre-item"><div class="resumen-pre-label">Productos distintos</div><div class="resumen-pre-value" id="pre-productos">—</div></div>
-            </div>
-          </div>
-          <div class="progress-bar-wrap" id="progress-wrap">
-            <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill"></div></div>
-            <div class="progress-label" id="progress-label">Procesando...</div>
-          </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
-            <button class="btn btn-primary" id="btn-importar" type="button" onclick="importar()" disabled>↑ Importar ventas</button>
-            <button class="btn btn-secondary" type="button" onclick="abrirCargaManual()">+ Carga manual</button>
-            <span id="importar-status" style="font-size:12px;color:#8a7a5a"></span>
-          </div>
+          <div id="v-tabla-historial"><div class="loading">Seleccioná tipo y mes para ver el historial.</div></div>
         </div>
       </div>
-      <div id="ventas-reportes"></div>
     </div>
   </div>
 
@@ -563,9 +594,8 @@ function apiGet(action, params) {
   });
 }
 function apiPost(action, data) {
-  // Los POSTs invalidan caché relacionada
-  var prefix = API_URL + '?action=' + action.replace(/registrar|agregar|eliminar|borrar/i,'');
-  Object.keys(_apiCache).forEach(function(k){ if(k.indexOf(API_URL)>=0) delete _apiCache[k]; });
+  // Invalidar TODO el caché en cualquier POST (escritura/borrado)
+  _apiCache = {};
   var url = API_URL + '?action=' + action + '&data=' + encodeURIComponent(JSON.stringify(data));
   return fetch(url).then(function(r){ return r.json(); });
 }
@@ -1124,8 +1154,105 @@ function gExportarHistorialExcel(){
 function gCargarResumen(){var mes=document.getElementById('g-res-mes').value;var anio=document.getElementById('g-res-anio').value;var cont=document.getElementById('g-resumen-contenido');cont.innerHTML='<div class="loading">Cargando...</div>';apiGet('resumenMensual',{mes:mes,anio:anio}).then(function(r){var fmt=function(n){return '$\u00a0'+(n||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});};cont.innerHTML='<div class="resumen-egresos-grid"><div class="resumen-egr-item variable"><div class="resumen-egr-label">📦 Compras / Insumos</div><div class="resumen-egr-valor">'+fmt(r.compras)+'</div></div><div class="resumen-egr-item variable"><div class="resumen-egr-label">🧾 Gastos variables</div><div class="resumen-egr-valor">'+fmt(r.gastosVar)+'</div></div><div class="resumen-egr-item variable"><div class="resumen-egr-label">🚗 Envíos</div><div class="resumen-egr-valor">'+fmt(r.envios)+'</div></div><div class="resumen-egr-item fijo"><div class="resumen-egr-label">🧾 Gastos fijos</div><div class="resumen-egr-valor">'+fmt(r.gastosFijos)+'</div></div><div class="resumen-egr-item fijo"><div class="resumen-egr-label">🏭 Bienes de Uso</div><div class="resumen-egr-valor">'+fmt(r.bienesDeUso)+'</div></div><div class="resumen-egr-item fijo"><div class="resumen-egr-label">🏠 Alquiler</div><div class="resumen-egr-valor">'+fmt(r.alquiler)+'</div></div><div class="resumen-egr-item fijo"><div class="resumen-egr-label">👷 Salarios</div><div class="resumen-egr-valor">'+fmt(r.salarios)+'</div></div><div class="resumen-egr-item"><div class="resumen-egr-label">🤝 Retiros socios</div><div class="resumen-egr-valor">'+fmt(r.retiros)+'</div></div></div><div class="resumen-subtotal-row fijo"><span class="rs-label">🔵 Total Costos Fijos</span><span class="rs-valor">'+fmt(r.totalFijo)+'</span></div><div class="resumen-subtotal-row variable"><span class="rs-label">🟡 Total Costos Variables</span><span class="rs-valor">'+fmt(r.totalVariable)+'</span></div><div class="resumen-total-row"><span class="rt-label">TOTAL EGRESOS DEL PERÍODO</span><span class="rt-valor">'+fmt(r.total)+'</span></div>';}).catch(function(){cont.innerHTML='<div class="loading">Error al cargar.</div>';});}
 
 // ============================================================
-// UTILS
+// HISTORIAL DE VENTAS
 // ============================================================
+var _vHistorialCache = null;
+var _vHistorialTipo = null;
+
+function vTab(id, btn) {
+  ['importar','historial'].forEach(function(t){ document.getElementById('vtab-'+t).style.display = t===id?'':'none'; });
+  document.querySelectorAll('#panel-ventas .gtab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  if(id==='historial') vInicializarHistorial();
+}
+
+function vInicializarHistorial() {
+  var hoy = new Date();
+  var mesActual = hoy.getMonth()+1, anioActual = hoy.getFullYear();
+  ['vh-mes','vh-anio'].forEach(function(id){
+    var el = document.getElementById(id); if(!el) return;
+    var isMes = id.includes('mes');
+    el.innerHTML = '<option value="">Todos</option>';
+    if(isMes){ MESES.slice(1).forEach(function(m,i){ var opt=document.createElement('option'); opt.value=i+1; opt.textContent=m; if(i+1===mesActual) opt.selected=true; el.appendChild(opt); }); }
+    else { for(var y=anioActual;y>=2026;y--){ var opt=document.createElement('option'); opt.value=y; opt.textContent=y; if(y===anioActual) opt.selected=true; el.appendChild(opt); } }
+  });
+}
+
+function vCargarHistorial() {
+  var tipo = document.getElementById('vh-tipo').value;
+  var mes  = document.getElementById('vh-mes').value;
+  var anio = document.getElementById('vh-anio').value;
+  var cont = document.getElementById('v-tabla-historial');
+  var action = tipo === 'ventasDia' ? 'ventasHistorialDia' : 'ventasHistorialProductos';
+  _vHistorialCache = null; _vHistorialTipo = tipo;
+  cont.innerHTML = '<div class="loading">Cargando...</div>';
+  apiGet(action, {mes:mes, anio:anio}).then(function(rows){
+    _vHistorialCache = rows || [];
+    vFiltrarLocal();
+  }).catch(function(){ cont.innerHTML = '<div class="loading">Error al cargar.</div>'; });
+}
+
+function vFiltrarLocal() {
+  if(!_vHistorialCache) return;
+  var busq = (document.getElementById('vh-buscar').value||'').toLowerCase().trim();
+  var filtradas = _vHistorialCache.filter(function(r){
+    return !busq || Object.values(r).some(function(v){ return String(v||'').toLowerCase().includes(busq); });
+  });
+  vRenderTabla(filtradas, _vHistorialTipo);
+}
+
+function vRenderTabla(rows, tipo) {
+  var cont = document.getElementById('v-tabla-historial');
+  if(!rows||!rows.length){ cont.innerHTML='<div class="loading">Sin registros para el período.</div>'; return; }
+  var cols = tipo==='ventasDia'
+    ? ['Mes','Fecha','Canal','Metodo','Pedidos','Descuentos','TicketMedio','Total']
+    : ['Mes','Producto','Cantidad','Subtotal'];
+  var deleteAction = tipo==='ventasDia' ? 'eliminarVentaDia' : 'eliminarVentaProducto';
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
+    cols.map(function(c){ return '<th>'+c+'</th>'; }).join('')+
+    '<th style="width:44px"></th></tr></thead><tbody>';
+  rows.forEach(function(r,idx){
+    html += '<tr>'+cols.map(function(c){
+      var val = r[c]!=null ? r[c] : '-';
+      if(typeof val==='number') return '<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';
+      return '<td>'+val+'</td>';
+    }).join('');
+    var rowIndex = r['_rowIndex']||0;
+    html += '<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';
+  cont.innerHTML = html;
+}
+
+function vEliminarRegistro(deleteAction, rowIndex, idx) {
+  if(!confirm('¿Eliminar este registro de ventas?')) return;
+  apiPost(deleteAction, {rowIndex:rowIndex}).then(function(r){
+    if(r.ok){
+      toast('Eliminado ✓');
+      if(_vHistorialCache){ _vHistorialCache.splice(idx,1); vFiltrarLocal(); }
+    } else toast('Error: '+(r.msg||''), false);
+  });
+}
+
+function vExportarExcel() {
+  var rows = _vHistorialCache;
+  if(!rows||!rows.length){ toast('No hay datos para exportar', false); return; }
+  var busq = (document.getElementById('vh-buscar').value||'').toLowerCase().trim();
+  if(busq) rows = rows.filter(function(r){ return Object.values(r).some(function(v){ return String(v||'').toLowerCase().includes(busq); }); });
+  var tipo = _vHistorialTipo||'ventas';
+  var mes  = document.getElementById('vh-mes').value;
+  var anio = document.getElementById('vh-anio').value;
+  var wb = XLSX.utils.book_new();
+  var exportRows = rows.map(function(r){ var o={}; Object.keys(r).filter(function(k){return k!=='_rowIndex';}).forEach(function(k){o[k]=r[k];}); return o; });
+  var ws = XLSX.utils.json_to_sheet(exportRows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+  XLSX.writeFile(wb, 'PapaAndres_'+tipo+'_'+(mes||'todo')+'_'+(anio||'')+'.xlsx');
+  toast('Excel descargado ✓');
+}
+
+
 var _tt;
 function toast(msg,ok){if(ok===undefined)ok=true;var el=document.getElementById('toast');el.textContent=msg;el.className='show '+(ok?'ok':'err');clearTimeout(_tt);_tt=setTimeout(function(){el.className='';},3000);}
 function v(id){var el=document.getElementById(id);return el?el.value.trim():'';}
