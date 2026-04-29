@@ -929,35 +929,47 @@ function renderBarChart(data) {
 
 function renderMiniResultado(d, prev, fmt, delta) {
   prev = prev || {};
+
+  // Badge compacto: solo "▲ 5%" o "▼ 3%" en verde/rojo
+  var badge = function(cur, ant, invert) {
+    if(!ant || ant === 0) return '';
+    var pct = ((cur - ant) / Math.abs(ant)) * 100;
+    var pos = invert ? pct <= 0 : pct >= 0;
+    var color = pos ? '#657a2d' : '#d61220';
+    return '<span style="font-size:10px;font-weight:600;color:'+color+';margin-left:6px">'+
+      (pct >= 0 ? '▲' : '▼')+' '+Math.abs(pct).toFixed(0)+'%</span>';
+  };
+
   var rows = [
-    { label:'Ventas brutas',   cur:d.ventasBrutas,  ant:prev.ventasBrutas,  neg:false },
-    { label:'Descuentos',      cur:d.descuentos,     ant:prev.descuentos,    neg:true, invert:true },
-    { label:'Compras/Insumos', cur:d.compras,        ant:prev.compras,       neg:true, invert:true },
-    { label:'Gastos variables',cur:d.gastosVar,      ant:prev.gastosVar,     neg:true, invert:true },
-    { label:'Gastos fijos',    cur:d.gastosF,        ant:prev.gastosF,       neg:true, invert:true },
-    { label:'Alquiler',        cur:d.alquiler,       ant:prev.alquiler,      neg:true, invert:true },
-    { label:'Salarios',        cur:d.salarios,       ant:prev.salarios,      neg:true, invert:true },
+    { label:'Ventas brutas',    cur:d.ventasBrutas, ant:prev.ventasBrutas, neg:false },
+    { label:'Descuentos',       cur:d.descuentos,   ant:prev.descuentos,   neg:true,  invert:true },
+    { label:'Compras/Insumos',  cur:d.compras,      ant:prev.compras,      neg:true,  invert:true },
+    { label:'Gastos variables', cur:d.gastosVar,    ant:prev.gastosVar,    neg:true,  invert:true },
+    { label:'Gastos fijos',     cur:d.gastosF,      ant:prev.gastosF,      neg:true,  invert:true },
+    { label:'Alquiler',         cur:d.alquiler,     ant:prev.alquiler,     neg:true,  invert:true },
+    { label:'Salarios',         cur:d.salarios,     ant:prev.salarios,     neg:true,  invert:true },
   ];
+
   var html = rows.map(function(r){
-    var dTag = (r.ant !== undefined && r.ant !== null) ? delta(r.cur, r.ant, r.invert) : '';
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid #f0e4cc;font-size:12px;gap:6px">'+
-      '<span style="color:#6b5e3e;flex-shrink:0">'+r.label+'</span>'+
-      '<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+
-        dTag+
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid #f0e4cc;font-size:12px">'+
+      '<span style="color:#6b5e3e">'+r.label+'</span>'+
+      '<span style="display:flex;align-items:center">'+
         '<span style="font-weight:500;color:'+(r.neg?'var(--rojo)':'var(--verde)')+';">'+(r.neg&&r.cur>0?'-':'')+fmt(r.cur)+'</span>'+
+        badge(r.cur, r.ant, r.invert)+
       '</span>'+
     '</div>';
   }).join('');
+
   var n = d.resultadoNeto||0, np = prev.resultadoNeto||0;
-  var dRes = (np !== 0) ? delta(n, np, false) : '';
   return html+
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 0;font-size:13px;gap:6px;flex-wrap:wrap">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 4px;font-size:13px">'+
       '<span style="font-weight:600;color:var(--verde)">Resultado neto</span>'+
-      '<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+
-        dRes+
+      '<span style="display:flex;align-items:center">'+
         '<span style="font-weight:700;color:'+(n>=0?'var(--oliva)':'var(--rojo)')+'">'+fmt(n)+'</span>'+
+        badge(n, np, false)+
       '</span>'+
-    '</div>';
+    '</div>'+
+    '<div style="font-size:10px;color:#b0a080;text-align:right;padding-top:2px">▲▼ variación vs mes anterior</div>';
 }
 
 function cambiarMes(num){ mesActivo=num; document.getElementById('topbar-mes').textContent=MESES[mesActivo]+' '+anioActivo; cargarDashboard(); }
