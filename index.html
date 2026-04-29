@@ -257,7 +257,8 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
           <div class="imported-banner" id="imported-banner" style="display:none">
             <span class="imported-banner-text" id="imported-banner-text"></span>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-secondary btn-sm" onclick="exportarExcel()">⬇ Exportar Excel</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportarHTMLVentas()">🖨 Reporte HTML</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportarExcel()">⬇ Excel</button>
               <button class="btn btn-secondary btn-sm" onclick="abrirCargaManual()">+ Carga manual</button>
               <button class="btn btn-danger btn-sm" onclick="borrarMes()">🗑 Borrar y reimportar</button>
             </div>
@@ -633,7 +634,8 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <select id="er-anio" class="form-input" onchange="erCargar()">
               <option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option>
             </select></div>
-          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="erExportarExcel()">⬇ Exportar Excel</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="erExportarHTML()">🖨 Reporte HTML</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="erExportarExcel()">⬇ Excel</button>
         </div>
       </div>
       <div id="er-contenido"><div class="loading">Seleccioná el año para cargar el reporte.</div></div>
@@ -831,6 +833,10 @@ document.addEventListener('DOMContentLoaded', function() {
   cargarDashboard();
   // Precarga especulativa del módulo más probable (ventas)
   setTimeout(function(){ precargar('ventas'); }, 2000);
+  // ── Keep-alive: ping silencioso cada 4 min para evitar cold-start de Apps Script ──
+  setInterval(function(){
+    fetch(API_URL + '?action=ping&_t=' + Date.now()).catch(function(){});
+  }, 4 * 60 * 1000);
 });
 
 // ============================================================
@@ -850,6 +856,9 @@ function nav(id, btn) {
 // ============================================================
 // DASHBOARD
 // ============================================================
+var _dashData = null;
+var _dashPrevData = null;
+
 function cargarDashboard() {
   // Skeleton inmediato
   document.getElementById('panel-dashboard').innerHTML =
@@ -857,13 +866,30 @@ function cargarDashboard() {
     '<div class="kpi-grid">'+'<div class="skel skel-kpi"></div>'.repeat(4)+'</div>'+
     '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px"><div class="skel" style="height:180px;border-radius:12px"></div><div class="skel" style="height:180px;border-radius:12px"></div></div>';
 
-  apiGet('dashboard', { mes: mesActivo, anio: anioActivo })
-    .then(renderDashboard)
-    .catch(function(){ document.getElementById('panel-dashboard').innerHTML='<div class="loading">Error cargando el dashboard.</div>'; });
+  var mesAnt = mesActivo === 1 ? 12 : mesActivo - 1;
+  var anioAnt = mesActivo === 1 ? anioActivo - 1 : anioActivo;
+
+  // Lanzar ambos requests en paralelo
+  Promise.all([
+    apiGet('dashboard', { mes: mesActivo, anio: anioActivo }),
+    apiGet('dashboard', { mes: mesAnt, anio: anioAnt }),
+  ]).then(function(results){
+    _dashData = results[0];
+    _dashPrevData = results[1];
+    renderDashboard(_dashData, _dashPrevData);
+  }).catch(function(){ document.getElementById('panel-dashboard').innerHTML='<div class="loading">Error cargando el dashboard.</div>'; });
 }
 
-function renderDashboard(d) {
+function renderDashboard(d, prev) {
+  prev = prev || {};
   var fmt = function(n){ return '$\u00A0'+Math.round(n||0).toLocaleString('es-AR'); };
+  var delta = function(cur, ant, invert) {
+    if(!ant || ant === 0) return '';
+    var pct = ((cur - ant) / Math.abs(ant)) * 100;
+    var pos = invert ? pct <= 0 : pct >= 0;
+    return '<span style="font-size:10px;color:'+(pos?'var(--oliva)':'var(--rojo)')+'">'+
+      (pct >= 0 ? '▲' : '▼')+' '+Math.abs(pct).toFixed(1)+'% vs mes ant.</span>';
+  };
   var mesesHTML = MESES.slice(1).map(function(m,i){
     var num=i+1, cls='mtab';
     if(num===mesActivo) cls+=' active';
@@ -886,7 +912,7 @@ function renderDashboard(d) {
     '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px">'+
       '<div class="card"><div class="card-title">Ventas por mes — '+anioActivo+'</div>'+
         '<div style="height:120px;display:flex;align-items:flex-end;gap:6px">'+renderBarChart(d.ventasPorMes)+'</div></div>'+
-      '<div class="card"><div class="card-title">Resultado · '+MESES[mesActivo]+'</div>'+renderMiniResultado(d,fmt)+'</div>'+
+      '<div class="card"><div class="card-title">Resultado · '+MESES[mesActivo]+'</div>'+renderMiniResultado(d, prev, fmt, delta)+'</div>'+
     '</div>';
 }
 
@@ -901,11 +927,37 @@ function renderBarChart(data) {
   }).join('');
 }
 
-function renderMiniResultado(d,fmt) {
-  var rows=[['Ventas brutas',fmt(d.ventasBrutas),false],['Descuentos',fmt(d.descuentos),true],['Compras/Insumos',fmt(d.compras),true],['Gastos variables',fmt(d.gastosVar),true],['Gastos fijos',fmt(d.gastosF),true],['Alquiler',fmt(d.alquiler),true],['Salarios',fmt(d.salarios),true]];
-  var html=rows.map(function(r){return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:.5px solid #f0e4cc;font-size:12px"><span style="color:#6b5e3e">'+r[0]+'</span><span style="font-weight:500;color:'+(r[2]?'var(--rojo)':'var(--verde)')+';">'+(r[2]&&r[1]!=='$\u00A00'?'-':'')+r[1]+'</span></div>';}).join('');
-  var n=d.resultadoNeto||0;
-  return html+'<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px"><span style="font-weight:600;color:var(--verde)">Resultado neto</span><span style="font-weight:700;color:'+(n>=0?'var(--oliva)':'var(--rojo)')+'">'+fmt(n)+'</span></div>';
+function renderMiniResultado(d, prev, fmt, delta) {
+  prev = prev || {};
+  var rows = [
+    { label:'Ventas brutas',   cur:d.ventasBrutas,  ant:prev.ventasBrutas,  neg:false },
+    { label:'Descuentos',      cur:d.descuentos,     ant:prev.descuentos,    neg:true, invert:true },
+    { label:'Compras/Insumos', cur:d.compras,        ant:prev.compras,       neg:true, invert:true },
+    { label:'Gastos variables',cur:d.gastosVar,      ant:prev.gastosVar,     neg:true, invert:true },
+    { label:'Gastos fijos',    cur:d.gastosF,        ant:prev.gastosF,       neg:true, invert:true },
+    { label:'Alquiler',        cur:d.alquiler,       ant:prev.alquiler,      neg:true, invert:true },
+    { label:'Salarios',        cur:d.salarios,       ant:prev.salarios,      neg:true, invert:true },
+  ];
+  var html = rows.map(function(r){
+    var dTag = (r.ant !== undefined && r.ant !== null) ? delta(r.cur, r.ant, r.invert) : '';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:.5px solid #f0e4cc;font-size:12px;gap:6px">'+
+      '<span style="color:#6b5e3e;flex-shrink:0">'+r.label+'</span>'+
+      '<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+
+        dTag+
+        '<span style="font-weight:500;color:'+(r.neg?'var(--rojo)':'var(--verde)')+';">'+(r.neg&&r.cur>0?'-':'')+fmt(r.cur)+'</span>'+
+      '</span>'+
+    '</div>';
+  }).join('');
+  var n = d.resultadoNeto||0, np = prev.resultadoNeto||0;
+  var dRes = (np !== 0) ? delta(n, np, false) : '';
+  return html+
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 0;font-size:13px;gap:6px;flex-wrap:wrap">'+
+      '<span style="font-weight:600;color:var(--verde)">Resultado neto</span>'+
+      '<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+
+        dRes+
+        '<span style="font-weight:700;color:'+(n>=0?'var(--oliva)':'var(--rojo)')+'">'+fmt(n)+'</span>'+
+      '</span>'+
+    '</div>';
 }
 
 function cambiarMes(num){ mesActivo=num; document.getElementById('topbar-mes').textContent=MESES[mesActivo]+' '+anioActivo; cargarDashboard(); }
@@ -1013,6 +1065,11 @@ function xlAoaToSheet(aoa) {
 // ============================================================
 // EXPORTAR EXCEL VENTAS (estilizado)
 // ============================================================
+// Variables globales para exportación HTML (guardan el último data renderizado)
+var _lastVentasData = null;
+var _lastVentasMes = null;
+var _lastVentasAnio = null;
+
 function exportarExcel() {
   var mes = parseInt(document.getElementById('v-mes').value);
   var anio = parseInt(document.getElementById('v-anio').value);
@@ -1022,6 +1079,11 @@ function exportarExcel() {
       if(!datos||(!datos.dia.length&&!datos.productos.length)){ toast('No hay datos para exportar',false); return; }
       generarExcelVentas(datos, mes, anio);
     });
+}
+
+function exportarHTMLVentas() {
+  if(!_lastVentasData){ toast('Cargá primero los datos del mes',false); return; }
+  generarHTMLVentas(_lastVentasData, _lastVentasMes, _lastVentasAnio);
 }
 
 function generarExcelVentas(datos, mes, anio) {
@@ -1101,6 +1163,9 @@ function generarExcelVentas(datos, mes, anio) {
 }
 
 function renderReportes(data, mes, anio) {
+  _lastVentasData = data;
+  _lastVentasMes = mes;
+  _lastVentasAnio = anio;
   var fmt=function(n){return '$\u00A0'+Math.round(n||0).toLocaleString('es-AR');};
   var totalV=data.totalVentas||0,desc=data.descuentos||0,neta=totalV-desc;
   var pedidos=data.pedidos||0,ticket=pedidos>0?totalV/pedidos:0;
@@ -1578,6 +1643,259 @@ function erExportarExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Estado de Resultados');
   XLSX.writeFile(wb, 'PapaAndres_EstadoResultados_'+_erData.anio+'.xlsx');
   toast('Excel descargado ✓');
+}
+
+// ============================================================
+// EXPORTAR HTML — VENTAS (abre nueva pestaña, idéntico a la app)
+// ============================================================
+function generarHTMLVentas(data, mes, anio) {
+  var fmt = function(n){ return '$\u00A0'+Math.round(n||0).toLocaleString('es-AR'); };
+  var nombreMes = MESES[mes] + ' ' + anio;
+  var totalV = data.totalVentas||0, desc = data.descuentos||0, neta = totalV-desc;
+  var pedidos = data.pedidos||0, ticket = pedidos>0?Math.round(totalV/pedidos):0;
+  var COLORES_EXP = ['#233f20','#657a2d','#f4a21d','#d61220','#175ea5','#77060e'];
+
+  // ── Barras SVG canales ──
+  function svgBarras(items, total, colorField, labelField, valueField) {
+    var barH = 24, gap = 8, w = 360;
+    var svg = '<svg width="'+w+'" height="'+(items.length*(barH+gap))+'" xmlns="http://www.w3.org/2000/svg">';
+    items.forEach(function(item, i){
+      var val = item[valueField]||0;
+      var pct = total > 0 ? val/total : 0;
+      var bw = Math.max(Math.round(pct*(w-110)), 2);
+      var col = COLORES_EXP[i % COLORES_EXP.length];
+      var y = i*(barH+gap);
+      svg += '<text x="0" y="'+(y+16)+'" font-size="11" font-family="sans-serif" fill="#6b5e3e">'+item[labelField]+'</text>';
+      svg += '<rect x="110" y="'+(y+4)+'" width="'+bw+'" height="16" rx="4" fill="'+col+'"/>';
+      svg += '<text x="'+(110+bw+6)+'" y="'+(y+16)+'" font-size="10" font-family="sans-serif" fill="#8a7a5a">'+fmt(val)+' ('+Math.round(pct*100)+'%)</text>';
+    });
+    svg += '</svg>';
+    return svg;
+  }
+
+  // ── Barras verticales días de semana ──
+  function svgDias(dias) {
+    var w = 320, h = 120, barW = 32, gap = 8;
+    var maxV = Math.max.apply(null, dias.map(function(d){return d.total||0;})); if(!maxV) maxV=1;
+    var svg = '<svg width="'+w+'" height="'+(h+30)+'" xmlns="http://www.w3.org/2000/svg">';
+    dias.forEach(function(d, i){
+      var bh = Math.max(Math.round((d.total/maxV)*(h-20)), d.total>0?4:2);
+      var x = i*(barW+gap)+10;
+      var isMax = d.total===maxV&&d.total>0;
+      svg += '<rect x="'+x+'" y="'+(h-bh)+'" width="'+barW+'" height="'+bh+'" rx="4" fill="'+(isMax?'#d61220':'#233f20')+'" opacity="'+(d.total>0?1:.2)+'"/>';
+      svg += '<text x="'+(x+barW/2)+'" y="'+(h+14)+'" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#8a7a5a">'+d.dia+'</text>';
+      if(d.total>0) svg += '<text x="'+(x+barW/2)+'" y="'+(h-bh-4)+'" text-anchor="middle" font-size="9" font-family="sans-serif" fill="#8a7a5a">'+Math.round(d.total/1000)+'k</text>';
+    });
+    svg += '</svg>';
+    return svg;
+  }
+
+  var canales = data.porCanal||[];
+  var metodos = data.porMetodo||[];
+  var dias    = data.porDiaSemana||[];
+  var prods   = data.productos||[];
+  var totalP  = prods.reduce(function(s,p){return s+(p.subtotal||0);},0);
+
+  var rankRows = prods.slice(0,20).map(function(p,i){
+    var pct = totalP>0?(p.subtotal/totalP*100).toFixed(1):0;
+    var barW = Math.round((p.subtotal/totalP)*200);
+    return '<tr style="border-bottom:1px solid #f0e4cc">'+
+      '<td style="padding:7px 10px;font-weight:600;color:#8a7a5a">'+(i<3?['🥇','🥈','🥉'][i]:(i+1))+'</td>'+
+      '<td style="padding:7px 10px;font-weight:500;color:#233f20">'+p.producto+'</td>'+
+      '<td style="padding:7px 10px;text-align:right">'+p.cantidad+'</td>'+
+      '<td style="padding:7px 10px;text-align:right;font-weight:600;color:#233f20">'+fmt(p.subtotal)+'</td>'+
+      '<td style="padding:7px 10px;text-align:right;color:#8a7a5a">'+pct+'%</td>'+
+      '<td style="padding:7px 16px"><div style="background:#f0e4cc;border-radius:3px;height:6px"><div style="background:#233f20;width:'+barW+'px;max-width:200px;height:100%;border-radius:3px"></div></div></td>'+
+    '</tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'+
+    '<title>Papá Andrés — Ventas '+nombreMes+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'Segoe UI\',sans-serif;background:#f5f0e8;color:#1a1a1a;padding:24px}'+
+    '.page{max-width:960px;margin:0 auto}'+
+    '.header{background:#233f20;color:#fcebca;border-radius:12px;padding:20px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}'+
+    '.header h1{font-size:20px;font-weight:700;letter-spacing:.5px}'+
+    '.header .sub{font-size:13px;opacity:.7;margin-top:2px}'+
+    '.header .mes{font-size:28px;font-weight:700;color:#fcebca}'+
+    '.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}'+
+    '.kpi{background:#fff;border-radius:10px;border:1px solid #e8d9b8;padding:14px 18px}'+
+    '.kpi-label{font-size:10px;font-weight:600;color:#8a7a5a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}'+
+    '.kpi-value{font-size:22px;font-weight:700;color:#233f20}'+
+    '.kpi-value.neg{color:#d61220}.kpi-value.pos{color:#657a2d}'+
+    '.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}'+
+    '.card{background:#fff;border-radius:12px;border:1px solid #e8d9b8;padding:18px 22px;margin-bottom:16px}'+
+    '.card-title{font-size:11px;font-weight:700;color:#233f20;text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;padding-bottom:8px;border-bottom:1.5px solid #f0e4cc}'+
+    'table{width:100%;border-collapse:collapse;font-size:12px}'+
+    'thead th{background:#233f20;color:#fcebca;padding:8px 10px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}'+
+    'thead th.r{text-align:right}'+
+    '.footer{text-align:center;font-size:11px;color:#8a7a5a;margin-top:20px;padding:12px}'+
+    '@media print{body{background:#fff;padding:0}.card{page-break-inside:avoid}}'+
+    '</style></head><body>'+
+    '<div class="page">'+
+    '<div class="header">'+
+      '<div><div style="font-size:13px;opacity:.6;margin-bottom:4px">🍕 PAPÁ ANDRÉS — REPORTE DE VENTAS</div><h1>'+nombreMes+'</h1></div>'+
+      '<div style="text-align:right"><div style="font-size:12px;opacity:.6">Ventas netas</div><div class="mes">'+fmt(neta)+'</div></div>'+
+    '</div>'+
+    '<div class="kpi-grid">'+
+      '<div class="kpi"><div class="kpi-label">Ventas brutas</div><div class="kpi-value">'+fmt(totalV)+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Descuentos</div><div class="kpi-value neg">-'+fmt(desc)+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Ventas netas</div><div class="kpi-value pos">'+fmt(neta)+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Total pedidos</div><div class="kpi-value">'+pedidos+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Ticket medio</div><div class="kpi-value">'+fmt(ticket)+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Días trabajados</div><div class="kpi-value">'+(data.diasUnicos||0)+'</div></div>'+
+    '</div>'+
+    '<div class="two-col">'+
+      '<div class="card"><div class="card-title">Por canal de venta</div>'+svgBarras(canales,totalV,'','canal','total')+'</div>'+
+      '<div class="card"><div class="card-title">Por método de pago</div>'+svgBarras(metodos,totalV,'','metodo','total')+'</div>'+
+    '</div>'+
+    '<div class="card"><div class="card-title">Ventas por día de la semana</div>'+svgDias(dias)+'</div>'+
+    '<div class="card"><div class="card-title">Ranking de productos</div>'+
+      '<table><thead><tr><th>#</th><th>Producto</th><th class="r">Unidades</th><th class="r">Ventas</th><th class="r">Part.</th><th>Barra</th></tr></thead>'+
+      '<tbody>'+rankRows+'</tbody></table>'+
+    '</div>'+
+    '<div class="footer">Papá Andrés · Sistema de Gestión 2026 · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
+    '</div></body></html>';
+
+  var w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  toast('Reporte HTML abierto en nueva pestaña ✓');
+}
+
+// ============================================================
+// EXPORTAR HTML — ESTADO DE RESULTADOS
+// ============================================================
+function erExportarHTML() {
+  if(!_erData){ toast('Primero cargá el reporte',false); return; }
+  var data = _erData;
+  var fmt  = function(n){ return '$\u00a0'+(Math.round(n||0)).toLocaleString('es-AR'); };
+  var fmtP = function(n){ return (n||0).toFixed(1)+'%'; };
+  var MC   = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var t    = data.totales;
+
+  // ── Barras SVG ventas vs egresos ──
+  var maxAbs = Math.max.apply(null, data.meses.map(function(m){ return Math.max(Math.abs(m.ventasNetas),Math.abs(m.totalEgresos)); }))||1;
+  var svgW = 720, barGrpW = 52, svgH = 140;
+  var svgBar = '<svg width="'+svgW+'" height="'+(svgH+20)+'" xmlns="http://www.w3.org/2000/svg">';
+  data.meses.forEach(function(m, i){
+    var hV = Math.max(Math.round((m.ventasNetas/maxAbs)*(svgH-10)), m.ventasNetas>0?3:0);
+    var hE = Math.max(Math.round((m.totalEgresos/maxAbs)*(svgH-10)), m.totalEgresos>0?3:0);
+    var sinDatos = m.ventasBrutas===0&&m.totalEgresos===0;
+    var x = i*barGrpW + 10;
+    var colE = m.resultado>=0 ? '#c8dfa0' : '#d61220';
+    svgBar += '<rect x="'+x+'" y="'+(svgH-hV)+'" width="22" height="'+hV+'" rx="3" fill="#233f20" opacity="'+(sinDatos?.2:1)+'"/>';
+    svgBar += '<rect x="'+(x+24)+'" y="'+(svgH-hE)+'" width="22" height="'+hE+'" rx="3" fill="'+colE+'" opacity="'+(sinDatos?.2:1)+'"/>';
+    svgBar += '<text x="'+(x+22)+'" y="'+(svgH+14)+'" text-anchor="middle" font-size="9" font-family="sans-serif" fill="#8a7a5a">'+MC[i]+'</text>';
+  });
+  svgBar += '</svg>';
+
+  // ── Tabla de resultados ──
+  var filasER = [
+    {label:'INGRESOS', tipo:'sec'},
+    {label:'Ventas brutas',    campo:'ventasBrutas',  neg:false},
+    {label:'(-) Descuentos',   campo:'descuentos',    neg:true},
+    {label:'= Ventas netas',   campo:'ventasNetas',   sub:true},
+    {label:'COSTOS VARIABLES', tipo:'sec'},
+    {label:'Compras / Insumos',campo:'compras',       neg:true},
+    {label:'Gastos variables', campo:'gastosVar',     neg:true},
+    {label:'Envíos',            campo:'envios',        neg:true},
+    {label:'= Total variable', campo:'totalVariable', sub:true, neg:true},
+    {label:'COSTOS FIJOS',     tipo:'sec'},
+    {label:'Gastos fijos',     campo:'gastosFijos',   neg:true},
+    {label:'Alquiler',         campo:'alquiler',      neg:true},
+    {label:'Salarios',         campo:'salarios',      neg:true},
+    {label:'Amortizaciones',   campo:'amortizacion',  neg:true},
+    {label:'= Total fijo',     campo:'totalFijo',     sub:true, neg:true},
+    {label:'TOTAL EGRESOS',    campo:'totalEgresos',  total:true},
+    {label:'RESULTADO NETO',   campo:'resultado',     resultado:true},
+    {label:'Margen %',         campo:'margen',        margen:true},
+  ];
+
+  function tdVal(v, neg, sub, total, resultado, margen, isTotal) {
+    var color = resultado ? (v>=0?'#657a2d':'#d61220') : neg&&!sub&&!total ? '#d61220' : '#233f20';
+    var fw    = (sub||total||resultado) ? '700' : '500';
+    var txt   = margen ? fmtP(v) : (v===0&&!isTotal ? '—' : fmt(v));
+    return '<td style="padding:6px 10px;text-align:right;font-weight:'+fw+';color:'+color+'">'+txt+'</td>';
+  }
+
+  var thead = '<tr><th style="padding:8px 10px;text-align:left;background:#233f20;color:#fcebca;font-size:10px;text-transform:uppercase;letter-spacing:.5px;min-width:180px">Concepto</th>'+
+    MC.map(function(m){return '<th style="padding:8px 8px;text-align:right;background:#233f20;color:#fcebca;font-size:10px;min-width:70px">'+m+'</th>';}).join('')+
+    '<th style="padding:8px 10px;text-align:right;background:#1a2e18;color:#fcebca;font-size:10px;min-width:80px">TOTAL</th></tr>';
+
+  var tbody = filasER.map(function(f){
+    if(f.tipo==='sec') return '<tr><td colspan="'+(MC.length+2)+'" style="background:#f5f0e8;color:#233f20;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding:8px 10px">'+f.label+'</td></tr>';
+    var bgRow = f.resultado ? 'background:#233f20;color:#fcebca' : f.total ? 'background:#2e1a1a;color:#ffcccc' : f.sub ? 'background:#f0ead8' : '';
+    var row = '<tr style="'+bgRow+';border-bottom:1px solid #f0e4cc">'+
+      '<td style="padding:6px 10px;font-weight:'+(f.sub||f.total||f.resultado?'700':'400')+'">'+f.label+'</td>';
+    data.meses.forEach(function(m){
+      var v = m[f.campo]||0;
+      var sinDatos = m.ventasBrutas===0&&m.totalEgresos===0&&!m.bienesDeUso&&!m.retiros;
+      row += tdVal(sinDatos?0:v, f.neg, f.sub, f.total, f.resultado, f.margen, !sinDatos);
+    });
+    var tv = t[f.campo]||0;
+    row += tdVal(tv, f.neg, f.sub, f.total, f.resultado, f.margen, true);
+    row += '</tr>';
+    return row;
+  }).join('');
+
+  // Filas informativas
+  tbody += '<tr><td colspan="'+(MC.length+2)+'" style="background:#f0ead8;color:#6b5e3e;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.8px;padding:8px 10px;border-top:2px solid #e0d0b0">MOVIMIENTOS DE CAPITAL / DISTRIBUCIÓN — no afectan el resultado</td></tr>';
+  [{label:'🏭 Inversión bienes de uso',campo:'bienesDeUso'},{label:'💸 Retiros de socios',campo:'retiros'}].forEach(function(f){
+    tbody += '<tr style="background:#fdf8f0;color:#8a7a5a;font-style:italic;border-bottom:1px solid #f0e4cc"><td style="padding:6px 10px">'+f.label+'</td>';
+    data.meses.forEach(function(m){ tbody += '<td style="padding:6px 10px;text-align:right;color:#8a7a5a">'+(m[f.campo]>0?fmt(m[f.campo]):'—')+'</td>'; });
+    tbody += '<td style="padding:6px 10px;text-align:right;font-weight:700;color:#8a7a5a">'+fmt(t[f.campo]||0)+'</td></tr>';
+  });
+
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'+
+    '<title>Papá Andrés — Estado de Resultados '+data.anio+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'Segoe UI\',sans-serif;background:#f5f0e8;color:#1a1a1a;padding:24px}'+
+    '.page{max-width:1100px;margin:0 auto}'+
+    '.header{background:#233f20;color:#fcebca;border-radius:12px;padding:20px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}'+
+    '.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}'+
+    '.kpi{background:#fff;border-radius:10px;border:1px solid #e8d9b8;padding:14px 18px}'+
+    '.kpi-label{font-size:10px;font-weight:600;color:#8a7a5a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}'+
+    '.kpi-value{font-size:18px;font-weight:700;color:#233f20}'+
+    '.card{background:#fff;border-radius:12px;border:1px solid #e8d9b8;padding:18px 22px;margin-bottom:16px;overflow-x:auto}'+
+    '.card-title{font-size:11px;font-weight:700;color:#233f20;text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;padding-bottom:8px;border-bottom:1.5px solid #f0e4cc}'+
+    'table{width:100%;border-collapse:collapse;font-size:11px}'+
+    '.nota{background:#fdf8f0;border:1px solid #e8d9b8;border-radius:8px;padding:12px 16px;margin-top:8px;font-size:11px;color:#8a7a5a;line-height:1.6}'+
+    '.footer{text-align:center;font-size:11px;color:#8a7a5a;margin-top:20px;padding:12px}'+
+    '@media print{body{background:#fff;padding:0}.card{page-break-inside:avoid}}'+
+    '</style></head><body>'+
+    '<div class="page">'+
+    '<div class="header">'+
+      '<div><div style="font-size:13px;opacity:.6;margin-bottom:4px">🍕 PAPÁ ANDRÉS — ESTADO DE RESULTADOS</div>'+
+        '<div style="font-size:22px;font-weight:700">'+data.anio+'</div></div>'+
+      '<div style="text-align:right"><div style="font-size:11px;opacity:.6">Resultado neto anual</div>'+
+        '<div style="font-size:28px;font-weight:700;color:'+(t.resultado>=0?'#8fba7a':'#ff9999')+'">'+fmt(t.resultado)+'</div>'+
+        '<div style="font-size:12px;opacity:.7">Margen '+fmtP(t.margen)+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="kpi-grid">'+
+      '<div class="kpi"><div class="kpi-label">Ventas netas anuales</div><div class="kpi-value">'+fmt(t.ventasNetas)+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Total egresos</div><div class="kpi-value" style="color:#d61220">'+fmt(t.totalEgresos)+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Resultado</div><div class="kpi-value" style="color:'+(t.resultado>=0?'#657a2d':'#d61220')+'">'+fmt(t.resultado)+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Margen</div><div class="kpi-value" style="color:'+(t.margen>=0?'#657a2d':'#d61220')+'">'+fmtP(t.margen)+'</div></div>'+
+    '</div>'+
+    '<div class="card"><div class="card-title">Ventas netas vs Egresos por mes</div>'+
+      svgBar+
+      '<div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:#8a7a5a">'+
+        '<span><span style="display:inline-block;width:10px;height:10px;background:#233f20;border-radius:2px;margin-right:4px"></span>Ventas netas</span>'+
+        '<span><span style="display:inline-block;width:10px;height:10px;background:#c8dfa0;border-radius:2px;margin-right:4px"></span>Egresos (positivo)</span>'+
+        '<span><span style="display:inline-block;width:10px;height:10px;background:#d61220;border-radius:2px;margin-right:4px"></span>Egresos (negativo)</span>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card"><div class="card-title">Estado de Resultados — '+data.anio+'</div>'+
+      '<table><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table>'+
+    '</div>'+
+    '<div class="nota"><strong style="color:#233f20">ℹ️ Criterio contable</strong> — Las amortizaciones reflejan el desgaste mensual (valor ÷ vida útil × 12). Bienes de uso y retiros de socios no afectan el resultado.</div>'+
+    '<div class="footer">Papá Andrés · Sistema de Gestión 2026 · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
+    '</div></body></html>';
+
+  var w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  toast('Reporte HTML abierto en nueva pestaña ✓');
 }
 
 // TOAST
