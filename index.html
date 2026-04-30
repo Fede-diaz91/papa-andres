@@ -210,6 +210,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     <div class="nav-item" onclick="nav('ventas',this)" onmouseenter="precargar('ventas')"><span class="ico">📈</span><span class="label">Ventas</span></div>
     <div class="nav-item" onclick="nav('gastos',this)" onmouseenter="precargar('gastos')"><span class="ico">🧾</span><span class="label">Compras y Gastos</span></div>
     <div class="nav-item" onclick="nav('salarios',this)" onmouseenter="precargar('salarios')"><span class="ico">👷</span><span class="label">Salarios y Retiros</span></div>
+    <div class="nav-item" onclick="nav('productos',this)" onmouseenter="precargar('productos')"><span class="ico">🍕</span><span class="label">Productos y Recetas</span></div>
     <div class="nav-item" onclick="nav('stock',this)"><span class="ico">📦</span><span class="label">Stock</span></div>
   </div>
   <div class="nav-section">
@@ -218,10 +219,10 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     <div class="nav-item" onclick="nav('rep-proveedores',this)"><span class="ico">🏭</span><span class="label">Mayor Proveedores</span></div>
     <div class="nav-item" onclick="nav('rep-caja',this)"><span class="ico">💰</span><span class="label">Caja y Bancos</span></div>
     <div class="nav-item" onclick="nav('rep-equilibrio',this)" onmouseenter="precargar('rep-equilibrio')"><span class="ico">⚖️</span><span class="label">Punto de Equilibrio</span></div>
-    <div class="nav-item" onclick="nav('rep-marginal',this)"><span class="ico">📉</span><span class="label">Análisis Marginal</span></div>
+    <div class="nav-item" onclick="nav('rep-marginal',this)" onmouseenter="precargar('rep-marginal')"><span class="ico">📉</span><span class="label">Análisis Marginal</span></div>
     <div class="nav-item" onclick="nav('rep-stock',this)"><span class="ico">🗃️</span><span class="label">Stock Permanente</span></div>
   </div>
-  <div class="nav-footer">v3.1 · Papá Andrés 2026</div>
+  <div class="nav-footer">v3.2 · Papá Andrés 2026</div>
 </aside>
 
 <div class="topbar">
@@ -625,6 +626,95 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
 
   <div id="panel-stock" class="panel"><div class="loading">Módulo de stock — próximamente.</div></div>
 
+  <!-- PRODUCTOS Y RECETAS -->
+  <div id="panel-productos" class="panel">
+    <div style="max-width:1200px;margin:0 auto">
+      <div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="gtab active" onclick="prodTab('listado',this)">🍕 Productos</button>
+        <button class="gtab" onclick="prodTab('nuevo',this)">➕ Nuevo producto</button>
+      </div>
+      <!-- LISTADO -->
+      <div id="prodtab-listado">
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div><label class="form-label">Rubro</label>
+              <select id="prod-filtro-rubro" class="form-input" style="min-width:160px" onchange="prodFiltrar()">
+                <option value="">Todos los rubros</option>
+              </select></div>
+            <div><label class="form-label">En carta</label>
+              <select id="prod-filtro-carta" class="form-input" onchange="prodFiltrar()">
+                <option value="">Todos</option>
+                <option value="SI">En carta</option>
+                <option value="NO">Fuera de carta</option>
+              </select></div>
+            <div style="flex:1;min-width:180px"><label class="form-label">Buscar</label>
+              <input type="text" id="prod-buscar" class="form-input" placeholder="Nombre del producto..." oninput="prodFiltrar()"></div>
+            <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="prodCargar()">↺ Actualizar</button>
+          </div>
+        </div>
+        <div id="prod-lista"><div class="loading">Cargando productos...</div></div>
+      </div>
+      <!-- NUEVO PRODUCTO -->
+      <div id="prodtab-nuevo" style="display:none">
+        <div class="card" style="max-width:600px">
+          <div class="card-title">Nuevo producto</div>
+          <div class="form-grid-2" style="margin-bottom:12px">
+            <div style="grid-column:1/-1"><label class="form-label">Nombre *</label><input type="text" id="np-nombre" class="form-input" placeholder="Ej: PIZZA CUATRO ESTACIONES" style="text-transform:uppercase"></div>
+            <div><label class="form-label">Rubro *</label>
+              <select id="np-rubro" class="form-input">
+                <option value="Pizzas">Pizzas</option>
+                <option value="Pizzas individuales">Pizzas individuales</option>
+                <option value="Pizzas super">Pizzas super</option>
+                <option value="Calzones">Calzones</option>
+                <option value="Empanadas">Empanadas</option>
+                <option value="Sanguches">Sanguches</option>
+                <option value="Otros">Otros</option>
+              </select></div>
+            <div><label class="form-label">En carta</label>
+              <select id="np-carta" class="form-input"><option value="SI">Sí</option><option value="NO">No</option></select></div>
+            <div><label class="form-label">Food cost target %</label><input type="number" id="np-foodcost" class="form-input" value="30" min="1" max="100"></div>
+          </div>
+          <button class="btn btn-primary" onclick="prodGuardarNuevo()">Guardar producto</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR PRODUCTO -->
+  <div id="modal-prod-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:200"></div>
+  <div id="modal-prod" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:94%;max-width:820px;max-height:90vh;overflow-y:auto;background:#fdf8f0;border:1.5px solid #e0d0b0;border-radius:14px;padding:24px;z-index:201;box-shadow:0 8px 40px rgba(0,0,0,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.5px" id="modal-prod-titulo">Editar producto</div>
+      <span style="cursor:pointer;color:#8a7a5a;font-size:18px" onclick="cerrarModalProd()">✕</span>
+    </div>
+    <!-- Datos generales -->
+    <div class="card" style="margin-bottom:14px;padding:14px 18px">
+      <div class="card-title">Datos generales</div>
+      <div class="form-grid-2" style="margin-bottom:10px">
+        <div><label class="form-label">Rubro</label><select id="ep-rubro" class="form-input"><option value="Pizzas">Pizzas</option><option value="Pizzas individuales">Pizzas individuales</option><option value="Pizzas super">Pizzas super</option><option value="Calzones">Calzones</option><option value="Empanadas">Empanadas</option><option value="Sanguches">Sanguches</option><option value="Otros">Otros</option></select></div>
+        <div><label class="form-label">En carta</label><select id="ep-carta" class="form-input"><option value="SI">Sí</option><option value="NO">No</option></select></div>
+        <div><label class="form-label">Food cost target %</label><input type="number" id="ep-foodcost" class="form-input" min="1" max="100"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="prodGuardarEdicion()">Guardar cambios</button>
+    </div>
+    <!-- Receta -->
+    <div class="card" style="padding:14px 18px">
+      <div class="card-title">Receta</div>
+      <div id="ep-receta-lista"></div>
+      <!-- Agregar ingrediente -->
+      <div style="background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:14px;margin-top:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--oliva);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">+ Agregar ingrediente</div>
+        <div class="form-grid-2" style="margin-bottom:10px">
+          <div><label class="form-label">Insumo / Subreceta *</label><input type="text" id="ni-insumo" class="form-input" placeholder="Ej: QUESO MOZZARELLA" style="text-transform:uppercase"></div>
+          <div><label class="form-label">Tipo</label><select id="ni-tipo" class="form-input"><option value="NO">🧂 Ingrediente</option><option value="SI">🔄 Subreceta</option></select></div>
+          <div><label class="form-label">Cantidad *</label><input type="number" id="ni-cantidad" class="form-input" min="0" step="0.001" placeholder="0.000"></div>
+          <div><label class="form-label">Unidad</label><select id="ni-unidad" class="form-input"><option>KG</option><option>LT</option><option>UNIDAD</option><option>ATADO</option><option>OTROS</option></select></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="prodAgregarIngrediente()">Agregar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ESTADO DE RESULTADOS -->
   <div id="panel-rep-resultados" class="panel">
     <div style="max-width:1200px;margin:0 auto">
@@ -658,7 +748,29 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
       <div id="pe-contenido"><div class="loading">Seleccioná mes y año para calcular el punto de equilibrio.</div></div>
     </div>
   </div>
-  <div id="panel-rep-marginal" class="panel"><div class="loading">Cargando reporte...</div></div>
+  <!-- ANÁLISIS MARGINAL -->
+  <div id="panel-rep-marginal" class="panel">
+    <div style="max-width:1200px;margin:0 auto">
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+          <div><label class="form-label">Rubro</label>
+            <select id="am-rubro" class="form-input" onchange="amFiltrar()">
+              <option value="">Todos los rubros</option>
+            </select></div>
+          <div><label class="form-label">Ordenar por</label>
+            <select id="am-orden" class="form-input" onchange="amFiltrar()">
+              <option value="margenPct">Margen % (mayor a menor)</option>
+              <option value="margen">Margen $ (mayor a menor)</option>
+              <option value="costoCalculado">Costo (menor a mayor)</option>
+              <option value="precioVenta">Precio de venta</option>
+            </select></div>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amCargar()">↺ Actualizar</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amExportarHTML()">🖨 Reporte HTML</button>
+        </div>
+      </div>
+      <div id="am-contenido"><div class="loading">Cargando análisis marginal...</div></div>
+    </div>
+  </div>
   <div id="panel-rep-stock" class="panel"><div class="loading">Cargando reporte...</div></div>
 </main>
 
@@ -780,6 +892,10 @@ function precargar(modulo) {
     apiGet('empleados').catch(function(){});
     apiGet('salarios', { mes: mes, anio: anio }).catch(function(){});
     apiGet('retiros', { mes: mes, anio: anio }).catch(function(){});
+  } else if (modulo === 'productos') {
+    apiGet('productos').catch(function(){});
+  } else if (modulo === 'rep-marginal') {
+    apiGet('analisisMarginal').catch(function(){});
   } else if (modulo === 'rep-equilibrio') {
     var hoy2 = new Date();
     apiGet('resumenMensual', { mes: hoy2.getMonth()+1, anio: hoy2.getFullYear() }).catch(function(){});
@@ -796,7 +912,8 @@ var DIAS_SEMANA = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 var COLORES = ['#233f20','#657a2d','#f4a21d','#d61220','#175ea5','#77060e'];
 var PANEL_TITLES = {
   dashboard:'Tablero de control', ventas:'Módulo de Ventas', gastos:'Compras y Gastos',
-  salarios:'Salarios y Retiros', stock:'Stock', 'rep-resultados':'Estado de Resultados',
+  salarios:'Salarios y Retiros', stock:'Stock', productos:'Productos y Recetas',
+  'rep-resultados':'Estado de Resultados',
   'rep-proveedores':'Mayor de Proveedores', 'rep-caja':'Caja y Bancos',
   'rep-equilibrio':'Punto de Equilibrio', 'rep-marginal':'Análisis Marginal', 'rep-stock':'Stock Permanente'
 };
@@ -868,6 +985,8 @@ function nav(id, btn) {
   if (id==='salarios') sInicializarModulo();
   if (id==='rep-resultados') erCargar();
   if (id==='rep-equilibrio') peInicializar();
+  if (id==='productos') prodInicializar();
+  if (id==='rep-marginal') amCargar();
 }
 
 // ============================================================
@@ -1672,6 +1791,396 @@ function erExportarExcel() {
   XLSX.utils.book_append_sheet(wb, ws, 'Estado de Resultados');
   XLSX.writeFile(wb, 'PapaAndres_EstadoResultados_'+_erData.anio+'.xlsx');
   toast('Excel descargado ✓');
+}
+
+// ============================================================
+// MÓDULO PRODUCTOS Y RECETAS
+// ============================================================
+var _prodCache = null;
+var _prodEditando = null;
+
+var RUBROS_PROD = ['Pizzas','Pizzas individuales','Pizzas super','Calzones','Empanadas','Sanguches','Otros'];
+
+function prodInicializar() {
+  if (!_prodCache) prodCargar();
+  else prodRenderListado(_prodCache);
+}
+
+function prodTab(id, btn) {
+  ['listado','nuevo'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
+  document.querySelectorAll('#panel-productos .gtab').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+function prodCargar() {
+  document.getElementById('prod-lista').innerHTML = '<div class="loading">Actualizando costos...</div>';
+  _prodCache = null;
+  apiGet('productos').then(function(data) {
+    _prodCache = data || [];
+    // Poblar selector de rubros
+    var rubros = [...new Set(_prodCache.map(function(p){ return p.rubro; }))].sort();
+    var sel = document.getElementById('prod-filtro-rubro');
+    sel.innerHTML = '<option value="">Todos los rubros</option>';
+    rubros.forEach(function(r){ sel.appendChild(new Option(r, r)); });
+    prodRenderListado(_prodCache);
+  }).catch(function(e){ document.getElementById('prod-lista').innerHTML='<div class="loading">Error: '+e.message+'</div>'; });
+}
+
+function prodFiltrar() {
+  if (!_prodCache) return;
+  var rubro  = document.getElementById('prod-filtro-rubro').value;
+  var carta  = document.getElementById('prod-filtro-carta').value;
+  var buscar = (document.getElementById('prod-buscar').value||'').toLowerCase().trim();
+  var filtrado = _prodCache.filter(function(p) {
+    if (rubro  && p.rubro !== rubro) return false;
+    if (carta === 'SI' && !p.enCarta) return false;
+    if (carta === 'NO' &&  p.enCarta) return false;
+    if (buscar && p.nombre.toLowerCase().indexOf(buscar) < 0) return false;
+    return true;
+  });
+  prodRenderListado(filtrado);
+}
+
+function prodRenderListado(lista) {
+  var cont = document.getElementById('prod-lista');
+  if (!lista || !lista.length) { cont.innerHTML='<div class="loading">Sin productos para mostrar.</div>'; return; }
+  var fmt = function(n){ return '$\u00a0'+Math.round(n||0).toLocaleString('es-AR'); };
+
+  // Agrupar por rubro
+  var grupos = {};
+  lista.forEach(function(p) {
+    if (!grupos[p.rubro]) grupos[p.rubro] = [];
+    grupos[p.rubro].push(p);
+  });
+
+  var html = '';
+  Object.keys(grupos).sort().forEach(function(rubro) {
+    html += '<div style="font-size:11px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 8px;padding-bottom:6px;border-bottom:2px solid #e8d9b8">'+rubro+'</div>';
+    html += '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
+      '<th>Producto</th><th style="text-align:right">Costo</th><th style="text-align:right">Precio venta</th>'+
+      '<th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th>'+
+      '<th style="text-align:right">Food cost %</th><th style="text-align:center">Semáforo</th>'+
+      '<th style="text-align:center">Carta</th><th style="width:60px"></th></tr></thead><tbody>';
+
+    grupos[rubro].forEach(function(p) {
+      var fc = p.foodCostReal;
+      var target = p.foodCostTarget;
+      var semColor = fc <= target ? '#657a2d' : fc <= target*1.2 ? '#f4a21d' : '#d61220';
+      var semEmoji = fc <= target ? '🟢' : fc <= target*1.2 ? '🟡' : '🔴';
+      var fuenteTag = p.fuentePrecio && p.fuentePrecio.indexOf('ventas') === 0
+        ? '<span style="font-size:9px;background:#e8f0c8;color:#657a2d;padding:1px 5px;border-radius:8px;margin-left:4px">ventas</span>'
+        : '<span style="font-size:9px;background:#f0e4cc;color:#8a7a5a;padding:1px 5px;border-radius:8px;margin-left:4px">manual</span>';
+
+      html += '<tr>'+
+        '<td style="font-weight:500;color:var(--verde)">'+p.nombre+(p.enCarta?'':' <span style="font-size:10px;color:#8a7a5a">(fuera carta)</span>')+'</td>'+
+        '<td class="num">'+fmt(p.costoCalculado)+'</td>'+
+        '<td class="num">'+fmt(p.precioVenta)+fuenteTag+'</td>'+
+        '<td class="num" style="color:'+(p.margen>0?'var(--oliva)':'var(--rojo)')+'">'+fmt(p.margen)+'</td>'+
+        '<td class="num" style="font-weight:600;color:'+(p.margenPct>0?'var(--oliva)':'var(--rojo)')+'">'+p.margenPct.toFixed(1)+'%</td>'+
+        '<td class="num" style="color:'+semColor+';font-weight:600">'+fc.toFixed(1)+'%'+
+          '<span style="font-size:10px;color:#8a7a5a;font-weight:400"> / '+target+'%</span></td>'+
+        '<td style="text-align:center;font-size:16px">'+semEmoji+'</td>'+
+        '<td style="text-align:center"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:'+(p.enCarta?'#d1fae5':'#f5f5f5')+';color:'+(p.enCarta?'#065f46':'#8a7a5a')+'">'+(p.enCarta?'SI':'NO')+'</span></td>'+
+        '<td><button onclick="prodAbrirEditar(\''+p.nombre+'\')" style="background:#f2f7e8;border:none;border-radius:6px;color:var(--verde);cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500">✏ Editar</button></td>'+
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  });
+
+  // Resumen
+  var totalProd = lista.length;
+  var ok = lista.filter(function(p){ return p.foodCostReal <= p.foodCostTarget; }).length;
+  var warn = lista.filter(function(p){ return p.foodCostReal > p.foodCostTarget && p.foodCostReal <= p.foodCostTarget*1.2; }).length;
+  var mal = lista.filter(function(p){ return p.foodCostReal > p.foodCostTarget*1.2; }).length;
+  html = '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">'+
+    '<div style="background:#d1fae5;border-radius:8px;padding:8px 14px;font-size:12px;color:#065f46;font-weight:600">🟢 '+ok+' dentro del target</div>'+
+    '<div style="background:#fef3c7;border-radius:8px;padding:8px 14px;font-size:12px;color:#92400e;font-weight:600">🟡 '+warn+' hasta 20% sobre target</div>'+
+    '<div style="background:#fff0f0;border-radius:8px;padding:8px 14px;font-size:12px;color:#d61220;font-weight:600">🔴 '+mal+' sobre el target</div>'+
+    '<div style="background:#f5f0e8;border-radius:8px;padding:8px 14px;font-size:12px;color:#8a7a5a">'+totalProd+' productos total</div>'+
+  '</div>' + html;
+
+  cont.innerHTML = html;
+}
+
+function prodAbrirEditar(nombre) {
+  var p = (_prodCache||[]).find(function(x){ return x.nombre === nombre; });
+  if (!p) return;
+  _prodEditando = p;
+  document.getElementById('modal-prod-titulo').textContent = '✏ Editar: '+nombre;
+  document.getElementById('ep-rubro').value = p.rubro || 'Otros';
+  document.getElementById('ep-carta').value = p.enCarta ? 'SI' : 'NO';
+  document.getElementById('ep-foodcost').value = p.foodCostTarget || 30;
+  prodRenderReceta(p);
+  document.getElementById('modal-prod-overlay').style.display = 'block';
+  document.getElementById('modal-prod').style.display = 'block';
+}
+
+function cerrarModalProd() {
+  document.getElementById('modal-prod').style.display = 'none';
+  document.getElementById('modal-prod-overlay').style.display = 'none';
+  _prodEditando = null;
+}
+
+function prodRenderReceta(p) {
+  var fmt = function(n){ return '$\u00a0'+Math.round(n||0).toLocaleString('es-AR'); };
+  var ing = p.ingredientes || [];
+  if (!ing.length) { document.getElementById('ep-receta-lista').innerHTML='<div style="color:#8a7a5a;font-size:12px;padding:8px 0">Sin ingredientes cargados.</div>'; return; }
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla" style="font-size:11px"><thead><tr>'+
+    '<th>Tipo</th><th>Insumo / Subreceta</th><th style="text-align:right">Cantidad</th><th>Unidad</th>'+
+    '<th style="text-align:right">Costo unit.</th><th style="text-align:right">Costo línea</th><th style="width:36px"></th></tr></thead><tbody>';
+  var totalCosto = 0;
+  ing.forEach(function(i) {
+    var esSub = i.esSubreceta;
+    var bg = esSub ? '#fdf8f0' : '#fff';
+    // Para mostrar costo: usar costoCalculado proporcional no está disponible por ítem,
+    // pero podemos mostrar que es subreceta
+    html += '<tr style="background:'+bg+'">'+
+      '<td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:'+(esSub?'#dbeafe':'#f0e4cc')+';color:'+(esSub?'#1e40af':'#8a7a5a')+'">'+(esSub?'🔄 Sub':'🧂 Ing')+'</span></td>'+
+      '<td style="font-weight:500;color:var(--verde)">'+i.insumo+'</td>'+
+      '<td class="num">'+i.cantidad+'</td>'+
+      '<td>'+i.unidad+'</td>'+
+      '<td class="num" style="color:#8a7a5a">—</td>'+
+      '<td class="num" style="color:#8a7a5a">—</td>'+
+      '<td><button onclick="prodEliminarIngrediente('+i._rowIndex+',\''+i.insumo+'\')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td>'+
+    '</tr>';
+  });
+  html += '</tbody><tfoot><tr style="background:var(--verde);color:var(--crema)"><td colspan="5" style="padding:7px 10px;font-weight:700">Costo total del plato</td>'+
+    '<td class="num" style="font-weight:700;color:var(--crema)">'+fmt(p.costoCalculado)+'</td><td></td></tr></tfoot></table></div>';
+  document.getElementById('ep-receta-lista').innerHTML = html;
+}
+
+function prodGuardarEdicion() {
+  if (!_prodEditando) return;
+  var data = {
+    nombre: _prodEditando.nombre,
+    rubro: document.getElementById('ep-rubro').value,
+    enCarta: document.getElementById('ep-carta').value === 'SI',
+    foodCostTarget: parseFloat(document.getElementById('ep-foodcost').value)||30
+  };
+  apiPost('editarProducto', data).then(function(r) {
+    if (r.ok) { toast('Guardado ✓'); _prodCache=null; cerrarModalProd(); prodCargar(); }
+    else toast('Error: '+(r.msg||''), false);
+  });
+}
+
+function prodAgregarIngrediente() {
+  if (!_prodEditando) return;
+  var insumo = document.getElementById('ni-insumo').value.trim().toUpperCase();
+  var cant   = parseFloat(document.getElementById('ni-cantidad').value)||0;
+  var unidad = document.getElementById('ni-unidad').value;
+  var esSub  = document.getElementById('ni-tipo').value;
+  if (!insumo || !cant) return toast('Completá insumo y cantidad', false);
+  apiPost('agregarIngrediente', {
+    producto: _prodEditando.nombre, insumo: insumo,
+    cantidad: cant, unidad: unidad, esSubreceta: esSub === 'SI'
+  }).then(function(r) {
+    if (r.ok) {
+      toast('Ingrediente agregado ✓');
+      document.getElementById('ni-insumo').value='';
+      document.getElementById('ni-cantidad').value='';
+      _prodCache=null;
+      apiGet('productos').then(function(data){
+        _prodCache=data||[];
+        var p = (_prodCache).find(function(x){ return x.nombre===_prodEditando.nombre; });
+        if(p){ _prodEditando=p; prodRenderReceta(p); }
+      });
+    } else toast('Error', false);
+  });
+}
+
+function prodEliminarIngrediente(rowIndex, insumo) {
+  if (!confirm('¿Eliminar "'+insumo+'" de la receta?')) return;
+  apiPost('eliminarIngrediente', { rowIndex: rowIndex }).then(function(r) {
+    if (r.ok) {
+      toast('Eliminado ✓');
+      _prodCache=null;
+      apiGet('productos').then(function(data){
+        _prodCache=data||[];
+        var p = (_prodCache).find(function(x){ return x.nombre===_prodEditando.nombre; });
+        if(p){ _prodEditando=p; prodRenderReceta(p); }
+      });
+    } else toast('Error', false);
+  });
+}
+
+function prodGuardarNuevo() {
+  var nombre = document.getElementById('np-nombre').value.trim().toUpperCase();
+  if (!nombre) return toast('El nombre es obligatorio', false);
+  apiPost('registrarProducto', {
+    nombre: nombre,
+    rubro: document.getElementById('np-rubro').value,
+    enCarta: document.getElementById('np-carta').value === 'SI',
+    foodCostTarget: parseFloat(document.getElementById('np-foodcost').value)||30
+  }).then(function(r) {
+    if (r.ok) {
+      toast('Producto creado ✓');
+      document.getElementById('np-nombre').value='';
+      _prodCache=null;
+      // Ir al listado
+      document.querySelectorAll('#panel-productos .gtab')[0].click();
+      prodCargar();
+    } else toast('Error: '+(r.msg||''), false);
+  });
+}
+
+// ============================================================
+// ANÁLISIS MARGINAL
+// ============================================================
+var _amData = null;
+
+function amCargar() {
+  document.getElementById('am-contenido').innerHTML='<div class="loading">Calculando márgenes...</div>';
+  _amData = null;
+  apiGet('analisisMarginal').then(function(data){
+    _amData = data;
+    // Poblar selector rubros
+    if (data && data.productos) {
+      var rubros = [...new Set(data.productos.map(function(p){return p.rubro;}))].sort();
+      var sel = document.getElementById('am-rubro');
+      sel.innerHTML = '<option value="">Todos los rubros</option>';
+      rubros.forEach(function(r){ sel.appendChild(new Option(r,r)); });
+    }
+    amFiltrar();
+  }).catch(function(e){ document.getElementById('am-contenido').innerHTML='<div class="loading">Error al cargar.</div>'; });
+}
+
+function amFiltrar() {
+  if (!_amData || !_amData.productos) return;
+  var rubro  = document.getElementById('am-rubro').value;
+  var orden  = document.getElementById('am-orden').value;
+  var lista  = _amData.productos.filter(function(p){ return !rubro || p.rubro===rubro; });
+  lista.sort(function(a,b){
+    if (orden==='costoCalculado') return a[orden]-b[orden];
+    return b[orden]-a[orden];
+  });
+  amRender(lista);
+}
+
+function amRender(lista) {
+  var cont = document.getElementById('am-contenido');
+  if (!lista||!lista.length){ cont.innerHTML='<div class="loading">Sin datos.</div>'; return; }
+  var fmt = function(n){ return '$\u00a0'+Math.round(n||0).toLocaleString('es-AR'); };
+
+  // KPIs
+  var avgMargen = lista.reduce(function(s,p){return s+p.margenPct;},0)/lista.length;
+  var avgFC     = lista.reduce(function(s,p){return s+p.foodCostReal;},0)/lista.length;
+  var mejorProd = lista[0];
+  var peorIdx   = lista.slice().sort(function(a,b){return a.margenPct-b.margenPct;})[0];
+
+  var kpis = '<div class="kpi-grid" style="margin-bottom:20px">'+
+    '<div class="kpi"><div class="kpi-label">Margen promedio</div><div class="kpi-value" style="color:var(--oliva)">'+avgMargen.toFixed(1)+'%</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Food cost promedio</div><div class="kpi-value">'+avgFC.toFixed(1)+'%</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Mayor margen</div><div class="kpi-value" style="color:var(--oliva);font-size:14px">'+mejorProd.nombre+'</div><div class="kpi-delta up">'+mejorProd.margenPct.toFixed(1)+'% — '+fmt(mejorProd.margen)+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Menor margen</div><div class="kpi-value" style="color:var(--rojo);font-size:14px">'+peorIdx.nombre+'</div><div class="kpi-delta down">'+peorIdx.margenPct.toFixed(1)+'% — '+fmt(peorIdx.margen)+'</div></div>'+
+  '</div>';
+
+  // Tabla ranking
+  var maxMargen = Math.max.apply(null, lista.map(function(p){return p.margenPct;}));
+  var html = '<div class="card"><div class="card-title">Ranking de contribución marginal</div>'+
+    '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
+    '<th>#</th><th>Producto</th><th>Rubro</th>'+
+    '<th style="text-align:right">Precio venta</th>'+
+    '<th style="text-align:right">Costo</th>'+
+    '<th style="text-align:right">Margen $</th>'+
+    '<th style="text-align:right">Margen %</th>'+
+    '<th style="text-align:right">Food cost %</th>'+
+    '<th style="min-width:120px">Barra</th>'+
+    '</tr></thead><tbody>';
+
+  lista.forEach(function(p, i) {
+    var fc = p.foodCostReal;
+    var target = p.foodCostTarget;
+    var semColor = fc <= target ? '#657a2d' : fc <= target*1.2 ? '#f4a21d' : '#d61220';
+    var barPct = maxMargen>0 ? Math.max(Math.round((p.margenPct/maxMargen)*100),2) : 2;
+    var barColor = p.margenPct >= avgMargen ? '#657a2d' : '#f4a21d';
+    var medallon = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+
+    html += '<tr>'+
+      '<td style="font-weight:600;color:#8a7a5a">'+medallon+'</td>'+
+      '<td style="font-weight:500;color:var(--verde)">'+p.nombre+'</td>'+
+      '<td style="color:#8a7a5a;font-size:11px">'+p.rubro+'</td>'+
+      '<td class="num">'+fmt(p.precioVenta)+'</td>'+
+      '<td class="num">'+fmt(p.costoCalculado)+'</td>'+
+      '<td class="num" style="font-weight:600;color:'+(p.margen>0?'var(--oliva)':'var(--rojo)')+'">'+fmt(p.margen)+'</td>'+
+      '<td class="num" style="font-weight:700;color:'+(p.margenPct>0?'var(--oliva)':'var(--rojo)')+'">'+p.margenPct.toFixed(1)+'%</td>'+
+      '<td class="num" style="color:'+semColor+';font-weight:600">'+fc.toFixed(1)+'%</td>'+
+      '<td><div style="background:#f0e4cc;border-radius:4px;height:8px;overflow:hidden"><div style="width:'+barPct+'%;height:100%;background:'+barColor+';border-radius:4px"></div></div></td>'+
+    '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+
+  // Nota
+  var nota = '<div style="background:#fdf8f0;border:1px solid #e8d9b8;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:11px;color:#8a7a5a">'+
+    'ℹ️ Los costos se calculan con el precio de la <strong>última compra registrada</strong> de cada insumo. El precio de venta proviene de las <strong>ventas reales importadas</strong> (subtotal ÷ unidades) o del valor manual en la hoja Productos. Actualizá las compras para mantener los costos al día.'+
+  '</div>';
+
+  cont.innerHTML = kpis + html + nota;
+}
+
+function amExportarHTML() {
+  if (!_amData||!_amData.productos){ toast('Primero cargá el reporte',false); return; }
+  var lista = _amData.productos.filter(function(p){ return !document.getElementById('am-rubro').value || p.rubro===document.getElementById('am-rubro').value; });
+  var orden = document.getElementById('am-orden').value;
+  lista.sort(function(a,b){ return orden==='costoCalculado'?a[orden]-b[orden]:b[orden]-a[orden]; });
+
+  var fmt = function(n){ return '$ '+Math.round(n||0).toLocaleString('es-AR'); };
+  var avgMargen = lista.reduce(function(s,p){return s+p.margenPct;},0)/lista.length;
+  var maxM = Math.max.apply(null, lista.map(function(p){return p.margenPct;}));
+
+  var filas = lista.map(function(p,i){
+    var fc = p.foodCostReal, target=p.foodCostTarget;
+    var semColor = fc<=target?'#657a2d':fc<=target*1.2?'#f4a21d':'#d61220';
+    var barW = maxM>0?Math.max(Math.round((p.margenPct/maxM)*180),3):3;
+    var barColor = p.margenPct>=avgMargen?'#657a2d':'#f4a21d';
+    var medallon = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+    return '<tr style="border-bottom:1px solid #f0e4cc">'+
+      '<td style="padding:7px 8px;font-weight:600;color:#8a7a5a">'+medallon+'</td>'+
+      '<td style="padding:7px 8px;font-weight:600;color:#233f20">'+p.nombre+'</td>'+
+      '<td style="padding:7px 8px;color:#8a7a5a;font-size:11px">'+p.rubro+'</td>'+
+      '<td style="padding:7px 8px;text-align:right">'+fmt(p.precioVenta)+'</td>'+
+      '<td style="padding:7px 8px;text-align:right">'+fmt(p.costoCalculado)+'</td>'+
+      '<td style="padding:7px 8px;text-align:right;font-weight:700;color:'+(p.margen>0?'#657a2d':'#d61220')+'">'+fmt(p.margen)+'</td>'+
+      '<td style="padding:7px 8px;text-align:right;font-weight:700;color:'+(p.margenPct>0?'#657a2d':'#d61220')+'">'+p.margenPct.toFixed(1)+'%</td>'+
+      '<td style="padding:7px 8px;text-align:right;color:'+semColor+';font-weight:600">'+fc.toFixed(1)+'%</td>'+
+      '<td style="padding:7px 8px"><div style="background:#f0e4cc;border-radius:4px;height:8px;width:180px"><div style="width:'+barW+'px;height:100%;background:'+barColor+';border-radius:4px"></div></div></td>'+
+    '</tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Papá Andrés — Análisis Marginal</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:\'Segoe UI\',sans-serif;background:#f5f0e8;padding:24px}'+
+    '.page{max-width:1100px;margin:0 auto}.header{background:#233f20;color:#fcebca;border-radius:12px;padding:20px 28px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}'+
+    '.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}'+
+    '.kpi{background:#fff;border-radius:10px;border:1px solid #e8d9b8;padding:14px 18px}'+
+    '.kpi-label{font-size:10px;font-weight:600;color:#8a7a5a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}'+
+    '.kpi-value{font-size:16px;font-weight:700;color:#233f20}'+
+    '.card{background:#fff;border-radius:12px;border:1px solid #e8d9b8;padding:18px 22px;margin-bottom:16px;overflow-x:auto}'+
+    '.card-title{font-size:11px;font-weight:700;color:#233f20;text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;padding-bottom:8px;border-bottom:1.5px solid #f0e4cc}'+
+    'table{width:100%;border-collapse:collapse;font-size:11px}th{background:#233f20;color:#fcebca;padding:8px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase}'+
+    '.nota{background:#fdf8f0;border:1px solid #e8d9b8;border-radius:8px;padding:10px 14px;font-size:11px;color:#8a7a5a;margin-top:8px}'+
+    '.footer{text-align:center;font-size:11px;color:#8a7a5a;margin-top:16px}'+
+    '@media print{body{background:#fff;padding:0}.card{page-break-inside:avoid}}</style></head>'+
+    '<body><div class="page">'+
+    '<div class="header"><div><div style="font-size:13px;opacity:.6;margin-bottom:4px">🍕 PAPÁ ANDRÉS — ANÁLISIS MARGINAL</div>'+
+      '<div style="font-size:20px;font-weight:700">'+lista.length+' productos analizados</div></div>'+
+      '<div style="text-align:right"><div style="font-size:11px;opacity:.6">Margen promedio</div>'+
+        '<div style="font-size:28px;font-weight:700">'+avgMargen.toFixed(1)+'%</div></div></div>'+
+    '<div class="kpi-grid">'+
+      '<div class="kpi"><div class="kpi-label">Margen promedio</div><div class="kpi-value" style="color:#657a2d">'+avgMargen.toFixed(1)+'%</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Mayor margen</div><div class="kpi-value" style="color:#657a2d;font-size:13px">'+lista[0].nombre+'</div><div style="font-size:11px;color:#657a2d">'+lista[0].margenPct.toFixed(1)+'%</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Menor margen</div><div class="kpi-value" style="color:#d61220;font-size:13px">'+lista[lista.length-1].nombre+'</div><div style="font-size:11px;color:#d61220">'+lista[lista.length-1].margenPct.toFixed(1)+'%</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Productos</div><div class="kpi-value">'+lista.length+'</div></div>'+
+    '</div>'+
+    '<div class="card"><div class="card-title">Ranking de contribución marginal</div>'+
+      '<table><thead><tr><th>#</th><th>Producto</th><th>Rubro</th><th style="text-align:right">Precio venta</th><th style="text-align:right">Costo</th><th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th><th style="text-align:right">Food cost %</th><th style="min-width:190px">Barra</th></tr></thead>'+
+      '<tbody>'+filas+'</tbody></table></div>'+
+    '<div class="nota">ℹ️ Costos calculados con precio de última compra de cada insumo. Precio de venta = promedio de ventas reales importadas.</div>'+
+    '<div class="footer">Papá Andrés · Análisis Marginal · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
+    '</div></body></html>';
+
+  var w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  toast('Reporte HTML abierto ✓');
 }
 
 // ============================================================
