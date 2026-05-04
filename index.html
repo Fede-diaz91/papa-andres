@@ -632,6 +632,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
       <div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap">
         <button class="gtab active" onclick="prodTab('listado',this)">🍕 Productos</button>
         <button class="gtab" onclick="prodTab('nuevo',this)">➕ Nuevo producto</button>
+        <button class="gtab" onclick="prodTab('precios',this)">💲 Precios de referencia</button>
       </div>
       <!-- LISTADO -->
       <div id="prodtab-listado">
@@ -675,6 +676,43 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <div><label class="form-label">Food cost target %</label><input type="number" id="np-foodcost" class="form-input" value="30" min="1" max="100"></div>
           </div>
           <button class="btn btn-primary" onclick="prodGuardarNuevo()">Guardar producto</button>
+        </div>
+      </div>
+      <!-- PRECIOS DE REFERENCIA -->
+      <div id="prodtab-precios" style="display:none">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title">Precios de referencia (PreciosBase)</div>
+          <p style="font-size:12px;color:#8a7a5a;margin-bottom:14px;line-height:1.6">
+            Estos precios se usan como <strong>referencia</strong> para insumos que no tienen compras registradas. 
+            Si un insumo tiene una compra real, ese precio siempre tiene prioridad sobre este.
+          </p>
+          <!-- Alerta insumos sin precio -->
+          <div id="pb-alerta-sinprecio" style="display:none;background:#fff3cd;border:1px solid #f4a21d;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#856404">
+            ⚠️ <strong>Insumos en recetas sin precio:</strong> <span id="pb-lista-sinprecio"></span>
+          </div>
+          <!-- Formulario agregar -->
+          <div style="background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:14px;margin-bottom:16px">
+            <div style="font-size:11px;font-weight:600;color:var(--oliva);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">+ Agregar / actualizar precio</div>
+            <div class="form-grid-2" style="margin-bottom:10px">
+              <div>
+                <label class="form-label">Insumo *</label>
+                <select id="pb-insumo" class="form-input">
+                  <option value="">— Seleccioná —</option>
+                </select>
+              </div>
+              <div><label class="form-label">Precio unitario $  *</label><input type="number" id="pb-precio" class="form-input" min="0" step="0.01" placeholder="0,00"></div>
+              <div>
+                <label class="form-label">Unidad</label>
+                <select id="pb-unidad" class="form-input">
+                  <option>KG</option><option>LT</option><option>UNIDAD</option><option>ATADO</option><option>PAQUETE</option><option>OTROS</option>
+                </select>
+              </div>
+              <div><label class="form-label">Notas</label><input type="text" id="pb-notas" class="form-input" placeholder="Ej: Precio de referencia mercado"></div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="pbGuardar()">Guardar precio</button>
+          </div>
+          <!-- Tabla de precios existentes -->
+          <div id="pb-lista"><div class="loading">Cargando...</div></div>
         </div>
       </div>
     </div>
@@ -1857,9 +1895,10 @@ function prodInicializar() {
 }
 
 function prodTab(id, btn) {
-  ['listado','nuevo'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
+  ['listado','nuevo','precios'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
   document.querySelectorAll('#panel-productos .gtab').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
+  if (id === 'precios') pbCargar();
 }
 
 function prodCargar() {
@@ -2089,6 +2128,134 @@ function prodEliminarProducto(nombre) {
       _prodCache = null;
       prodCargar();
     } else toast('Error: '+(r.msg||''), false);
+  });
+}
+
+// ============================================================
+// PRECIOS DE REFERENCIA (PreciosBase)
+// ============================================================
+var _pbCache = null;
+
+function pbCargar() {
+  document.getElementById('pb-lista').innerHTML = '<div class="loading">Cargando precios...</div>';
+  document.getElementById('pb-alerta-sinprecio').style.display = 'none';
+  _pbCache = null;
+
+  // Poblar select de insumos con G_INSUMOS
+  var selIns = document.getElementById('pb-insumo');
+  selIns.innerHTML = '<option value="">— Seleccioná —</option>';
+  G_INSUMOS.forEach(function(ins) {
+    selIns.appendChild(new Option(ins, ins));
+  });
+
+  // Cargar datos del GAS en paralelo: PreciosBase + Productos (para detectar sin precio)
+  Promise.all([
+    apiGet('preciosBase'),
+    _prodCache ? Promise.resolve(_prodCache) : apiGet('productos')
+  ]).then(function(results) {
+    var precios = results[0] || [];
+    _pbCache = precios;
+    if (!_prodCache) _prodCache = results[1] || [];
+
+    // Detectar insumos en recetas sin precio en ninguna fuente
+    pbDetectarSinPrecio(precios);
+    pbRender(precios);
+  }).catch(function(e) {
+    document.getElementById('pb-lista').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  });
+}
+
+function pbDetectarSinPrecio(precios) {
+  // Construir set de insumos con precio (PreciosBase)
+  var conPrecio = {};
+  precios.forEach(function(p) { conPrecio[p.insumo.toUpperCase()] = true; });
+
+  // Juntar todos los ingredientes de todas las recetas
+  var sinPrecio = [];
+  (_prodCache || []).forEach(function(prod) {
+    (prod.ingredientes || []).forEach(function(ing) {
+      if (!ing.esSubreceta && !conPrecio[ing.insumo]) {
+        // Tampoco tiene precio en _prodCache (costoCalculado refleja $0 si no hay precio)
+        if (sinPrecio.indexOf(ing.insumo) < 0) sinPrecio.push(ing.insumo);
+      }
+    });
+  });
+
+  if (sinPrecio.length) {
+    document.getElementById('pb-alerta-sinprecio').style.display = 'block';
+    document.getElementById('pb-lista-sinprecio').textContent = sinPrecio.join(', ');
+  } else {
+    document.getElementById('pb-alerta-sinprecio').style.display = 'none';
+  }
+}
+
+function pbRender(lista) {
+  var cont = document.getElementById('pb-lista');
+  if (!lista || !lista.length) {
+    cont.innerHTML = '<div class="loading" style="color:#8a7a5a">No hay precios de referencia cargados todavía.</div>';
+    return;
+  }
+  var fmt = function(n) { return '$ ' + Math.round(n || 0).toLocaleString('es-AR'); };
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>' +
+    '<th>Insumo</th><th style="text-align:right">Precio unit.</th><th>Unidad</th><th>Notas</th>' +
+    '<th style="width:140px;text-align:center">Acciones</th></tr></thead><tbody>';
+  lista.forEach(function(p) {
+    html += '<tr>' +
+      '<td style="font-weight:500;color:var(--verde)">' + p.insumo + '</td>' +
+      '<td style="text-align:right;font-weight:600">' + fmt(p.precioUnit) + '</td>' +
+      '<td>' + (p.unidad || '—') + '</td>' +
+      '<td style="color:#8a7a5a;font-size:11px">' + (p.notas || '—') + '</td>' +
+      '<td style="text-align:center;display:flex;gap:6px;justify-content:center">' +
+        '<button onclick="pbEditar(\'' + p.insumo + '\',' + p.precioUnit + ',\'' + (p.unidad||'') + '\',\'' + (p.notas||'').replace(/'/g,"\\'") + '\')" style="background:#f2f7e8;border:none;border-radius:6px;color:var(--verde);cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500">✏ Editar</button>' +
+        '<button onclick="pbEliminar(\'' + p.insumo + '\')" style="background:#fff0f0;border:none;border-radius:6px;color:var(--rojo);cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500">🗑</button>' +
+      '</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table></div>';
+  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">Total: ' + lista.length + ' insumos con precio de referencia</div>';
+  cont.innerHTML = html;
+}
+
+function pbEditar(insumo, precio, unidad, notas) {
+  document.getElementById('pb-insumo').value = insumo;
+  document.getElementById('pb-precio').value = precio;
+  document.getElementById('pb-unidad').value = unidad || 'KG';
+  document.getElementById('pb-notas').value = notas || '';
+  document.getElementById('pb-precio').focus();
+  // Scroll al formulario
+  document.getElementById('pb-insumo').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast('Editando: ' + insumo + ' — modificá el precio y guardá');
+}
+
+function pbGuardar() {
+  var insumo = document.getElementById('pb-insumo').value;
+  var precio = parseFloat(document.getElementById('pb-precio').value) || 0;
+  var unidad = document.getElementById('pb-unidad').value;
+  var notas  = document.getElementById('pb-notas').value.trim();
+  if (!insumo) return toast('Seleccioná un insumo', false);
+  if (!precio) return toast('Ingresá un precio válido', false);
+  toast('Guardando...');
+  apiPost('guardarPrecioBase', { insumo: insumo, precioUnit: precio, unidad: unidad, notas: notas })
+    .then(function(r) {
+      if (r.ok) {
+        toast('Precio guardado ✓');
+        document.getElementById('pb-insumo').value = '';
+        document.getElementById('pb-precio').value = '';
+        document.getElementById('pb-notas').value = '';
+        _pbCache = null;
+        pbCargar();
+      } else toast('Error: ' + (r.msg || ''), false);
+    });
+}
+
+function pbEliminar(insumo) {
+  if (!confirm('¿Eliminar el precio de referencia de "' + insumo + '"?')) return;
+  apiPost('eliminarPrecioBase', { insumo: insumo }).then(function(r) {
+    if (r.ok) {
+      toast('Precio eliminado ✓');
+      _pbCache = null;
+      pbCargar();
+    } else toast('Error: ' + (r.msg || ''), false);
   });
 }
 
