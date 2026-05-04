@@ -632,6 +632,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
       <div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap">
         <button class="gtab active" onclick="prodTab('listado',this)">🍕 Productos</button>
         <button class="gtab" onclick="prodTab('nuevo',this)">➕ Nuevo producto</button>
+        <button class="gtab" onclick="prodTab('insumos',this)">🧂 Insumos</button>
         <button class="gtab" onclick="prodTab('precios',this)">💲 Precios de referencia</button>
       </div>
       <!-- LISTADO -->
@@ -676,6 +677,45 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <div><label class="form-label">Food cost target %</label><input type="number" id="np-foodcost" class="form-input" value="30" min="1" max="100"></div>
           </div>
           <button class="btn btn-primary" onclick="prodGuardarNuevo()">Guardar producto</button>
+        </div>
+      </div>
+      <!-- INSUMOS -->
+      <div id="prodtab-insumos" style="display:none">
+        <div class="card">
+          <div class="card-title">Insumos</div>
+          <p style="font-size:12px;color:#8a7a5a;margin-bottom:14px;line-height:1.6">
+            Lista centralizada de insumos. Cualquier insumo agregado acá aparece automáticamente en Compras y en Recetas.
+          </p>
+          <!-- Formulario agregar -->
+          <div style="background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:14px;margin-bottom:16px">
+            <div style="font-size:11px;font-weight:600;color:var(--oliva);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">+ Agregar insumo</div>
+            <div class="form-grid-2" style="margin-bottom:10px">
+              <div><label class="form-label">Nombre *</label><input type="text" id="ins-nombre" class="form-input" placeholder="Ej: QUESO GRUYERE" style="text-transform:uppercase"></div>
+              <div>
+                <label class="form-label">Unidad por defecto</label>
+                <select id="ins-unidad" class="form-input">
+                  <option value="">Sin especificar</option>
+                  <option>KG</option><option>LT</option><option>UNIDAD</option>
+                  <option>ATADO</option><option>PAQUETE</option><option>LATA</option><option>BOTELLA</option><option>OTROS</option>
+                </select>
+              </div>
+              <div><label class="form-label">Categoría</label>
+                <select id="ins-categoria" class="form-input">
+                  <option value="">Sin categoría</option>
+                  <option>Quesos y fiambres</option><option>Salsas</option><option>Verduras y frescos</option>
+                  <option>Aceites</option><option>Harinas y secos</option><option>Huevos y lácteos</option>
+                  <option>Descartables y packaging</option><option>Pan</option><option>Bebidas</option><option>Otros</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="insAgregar()">Agregar insumo</button>
+          </div>
+          <!-- Buscador -->
+          <div style="margin-bottom:12px">
+            <input type="text" id="ins-buscar" class="form-input" placeholder="Buscar insumo..." oninput="insFiltrar()" style="max-width:340px">
+          </div>
+          <!-- Tabla -->
+          <div id="ins-lista"><div class="loading">Cargando...</div></div>
         </div>
       </div>
       <!-- PRECIOS DE REFERENCIA -->
@@ -955,40 +995,10 @@ var PANEL_TITLES = {
   'rep-proveedores':'Mayor de Proveedores', 'rep-caja':'Caja y Bancos',
   'rep-equilibrio':'Punto de Equilibrio', 'rep-marginal':'Análisis Marginal', 'rep-stock':'Stock Permanente'
 };
-var G_INSUMOS = [
-  // Quesos y fiambres
-  'QUESO MOZZARELLA','QUESO REGGIANITO','QUESO SARDO','QUESO AZUL','QUESO PROVOLONE',
-  'QUESO BARRA TYBO','QUESO PATEGRAS','QUESO FONTINA','MOZZARELLA VIDAL',
-  'JAMON COCIDO PREMIUM','JAMON NATURAL','JAMON CRUDO','JAMON SUPER',
-  'PANCETA','LONGANIZA','PEPPERONI','MORTADELA','MORTADELA SANGUCHE',
-  'BONDIOLA FIAMBRE','BONDIOLA','CANTIMPALO','OSOBUCO','SALAME',
-  // Salsas
-  'SALSA DE TOMATE ITALIANA','SALSA DE TOMATE NACIONAL',
-  // Verduras y frescos
-  'ALBAHACA','TOMATE CHERRY','TOMATES DESHIDRATADOS','CIRUELA DESHIDRATADA',
-  'ROMERO','MORRON','RUCULA','ESPINACA','CEBOLLA','CEBOLLA MORADA','CEBOLLA DE VERDEO',
-  'PUERRO','NUECES','AJO','CABUTIA','PEREJIL','ZANAHORIA',
-  // Aceites
-  'ACEITE DE OLIVA','ACEITE DE GIRASOL',
-  // Harinas, panificados y secos
-  'HARINA','SEMOLIN','SAL FINA','LEVADURA','AZUCAR',
-  'OREGANO','PIMIENTA NEGRA','TOMILLO','AJI MOLIDO','COMINO','NUEZ MOSCADA',
-  // Huevos, lácteos y otros
-  'HUEVO','MANTECA','MIEL','VINO','CERVEZA NEGRA',
-  'AGUA DE BIDON','ACEITUNA VERDE','ACEITUNA NEGRA',
-  // Empanadas
-  'TAPA DE EMPANADA',
-  // Descartables / packaging
-  'CAJA PIZZA GRANDE','CAJA EMPANADAS X 6','FONDOS PIZZEROS','FONDO PIZZERO CUADRICULADO',
-  'BANDEJA PIZZA','BOLSA PIZZA','STICKER SUPER','FOLEX',
-  // Pan
-  'PAN DE MOLDE LACTAL','PAN CIABATTA','PAN DE CAMPO',
-  // Bebidas
-  'LATA HEINEKEN 473ML.','LATA IMPERIAL RUBIA 473ML','LATA IMPERIAL ROJA 473ML','LATA IMPERIAL IPA 473ML.',
-  'BOTELLA LINEA COCA 1,5 LTS','BOTELLA LINEA COCA 500 ML',
-  // Otros
-  'POLLO','OTROS'
-];
+// G_INSUMOS se carga dinámicamente desde la API al iniciar (hoja Insumos del Sheets)
+// Este array se usa como fallback mientras carga, y se reemplaza al recibir los datos
+var G_INSUMOS = [];
+
 var G_VIDA_UTIL = { 'Rodados':5,'Cubiertos':10,'Mobiliario':10,'Cartelería':5,'Instalaciones':10 };
 var CATALOGO = {
   'Pizzas':['PIZZA MOZZARELLA','PIZZA LA BIANCA','PIZZA MARGARITA','PIZZA NAPOLITANA','PIZZA NAPO ESPAÑOLA','PIZZA CHERRY PAPPERS','PIZZA MORTABELLA','PIZZA PRIMAVERA','PIZZA 4 QUESOS','PIZZA CIRUELA AZUL','PIZZA ESPECIAL','PIZZA ESPECIAL DE ORO','PIZZA ELEGANTE JAMON','PIZZA ESPAÑOLA','PIZZA PEPPERONI','PIZZA ESPINACA','PIZZA LONGANIZA + CEBOLLA','PIZZA PANCETA Y HUEVO','PIZZA DI CIPOLLA','PIZZA BA-CON-CEBOLLA','PIZZA FUGA Z','PIZZA FUGAZZETA','PIZZA FUGAZZETA COMPLETA','PIZZA NOCE + QUESO AZUL','PIZZA GRAN FONTHI','PIZZA CABUTIA + NUEZ','PIZZA JAMON CRUDO Y RUCULA','PIZZA BONDIOLA FRANCESA','PIZZA BONDIOLIZZA','PIZZA BONDIOLA','PIZZA PANCETA D\'ORO','PIZZA NAPO-PESTO','PIZZA MORTAL KOMBAT','PIZZA MORTADELA C/RUCULA','PIZZA MOZZARELLA INDIVIDUAL','PIZZA MARGARITA INDIVIDUAL','PIZZA PEPPERONI INDIVIDUAL','PIZZA NAPOLITANA INDIVIDUAL'],
@@ -1023,6 +1033,12 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('topbar-mes').textContent = MESES[mesActivo]+' '+anioActivo;
   document.getElementById('v-mes').value  = mesActivo;
   document.getElementById('v-anio').value = anioActivo;
+  // Cargar insumos dinámicamente desde la API (fuente única de verdad)
+  apiGet('insumos').then(function(data) {
+    G_INSUMOS = (data || []).map(function(i){ return i.nombre; });
+    gInsumos  = G_INSUMOS.slice();
+    gLlenarInsumos();
+  }).catch(function(){ });
   // Precarga background de datos comunes
   apiGet('plataformas').then(function(lista){ _plataformas=lista||[]; renderSelectPlataformas(); }).catch(function(){});
   apiGet('proveedores').then(function(data){ gProveedores=data||[]; gLlenarSelectsProveedores(); }).catch(function(){});
@@ -1694,7 +1710,28 @@ function gSetTipo(tipo,btn){gTipoActual=tipo;document.querySelectorAll('.tipo-bt
 function gSetNat(nat,btn){gNatActual=nat;document.querySelectorAll('.nat-sel-btn').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');}
 function gLlenarInsumos(){var sel=document.getElementById('g-insumo');if(!sel)return;sel.innerHTML='<option value="">Seleccioná...</option>';gInsumos.forEach(function(i){sel.appendChild(new Option(i,i));});}
 function gCheckOtroInsumo(){var val=document.getElementById('g-insumo').value;document.getElementById('g-campo-otro-ins').style.display=val==='OTROS'?'block':'none';}
-function gGuardarInsumo(){var nombre=document.getElementById('g-ni-nombre').value.trim().toUpperCase();if(!nombre)return toast('Ingresá el nombre',false);if(!gInsumos.includes(nombre)){gInsumos.splice(gInsumos.length-1,0,nombre);gLlenarInsumos();}document.getElementById('g-insumo').value=nombre;document.getElementById('g-ni-nombre').value='';document.getElementById('g-panel-insumo').style.display='none';toast('Insumo "'+nombre+'" agregado ✓');}
+function gGuardarInsumo(){
+  var nombre = document.getElementById("g-ni-nombre").value.trim().toUpperCase();
+  if (!nombre) return toast("Ingresá el nombre", false);
+  if (G_INSUMOS.includes(nombre)) {
+    document.getElementById("g-insumo").value = nombre;
+    document.getElementById("g-ni-nombre").value = "";
+    document.getElementById("g-panel-insumo").style.display = "none";
+    return;
+  }
+  toast("Guardando insumo...");
+  apiPost("agregarInsumo", { nombre: nombre, unidad: "", categoria: "" }).then(function(r) {
+    if (r.ok) {
+      G_INSUMOS.push(nombre);
+      gInsumos = G_INSUMOS.slice();
+      gLlenarInsumos();
+      document.getElementById("g-insumo").value = nombre;
+      document.getElementById("g-ni-nombre").value = "";
+      document.getElementById("g-panel-insumo").style.display = "none";
+      toast("Insumo \"" + nombre + "\" agregado 2713");
+    } else toast("Error: " + (r.msg || ""), false);
+  });
+}
 function gMostrarVidaUtil(){var cat=document.getElementById('g-cat-bien').value;var info=document.getElementById('g-vida-util-info');if(cat&&G_VIDA_UTIL[cat]){document.getElementById('g-vida-util-anos').textContent=G_VIDA_UTIL[cat];info.style.display='block';}else{info.style.display='none';}}
 function gCalcMontos(){var cant=parseFloat(document.getElementById('g-cantidad').value)||0,prec=parseFloat(document.getElementById('g-precio-unit').value)||0,ivaPct=parseFloat(document.getElementById('g-iva').value)||0,percIVA=parseFloat(document.getElementById('g-perc-iva').value)||0,percIIBB=parseFloat(document.getElementById('g-perc-iibb').value)||0,percGan=parseFloat(document.getElementById('g-perc-gan').value)||0,sub=cant*prec,ivaMonto=sub*ivaPct/100;document.getElementById('g-subtotal').value=sub.toFixed(2);document.getElementById('g-iva-monto').value=ivaMonto.toFixed(2);document.getElementById('g-total-pagar').value=(sub+ivaMonto+percIVA+percIIBB+percGan).toFixed(2);}
 function gGuardar(){var fecha=document.getElementById('g-fecha').value,notas=document.getElementById('g-notas').value,prov=document.getElementById('g-proveedor').value;if(!fecha)return toast('La fecha es obligatoria',false);if(gTipoActual==='compra'){var insumo=document.getElementById('g-insumo').value;if(insumo==='OTROS')insumo=document.getElementById('g-insumo-otro').value.trim()||'OTROS';if(!insumo||!document.getElementById('g-unidad').value||!document.getElementById('g-cantidad').value||!document.getElementById('g-precio-unit').value)return toast('Completá insumo, unidad, cantidad y precio',false);apiPost('registrarCompra',{fecha:fecha,proveedor:prov,insumo:insumo,unidad:document.getElementById('g-unidad').value,cantidad:document.getElementById('g-cantidad').value,precioUnit:document.getElementById('g-precio-unit').value,subtotal:document.getElementById('g-subtotal').value,iva:document.getElementById('g-iva').value,ivaMonto:document.getElementById('g-iva-monto').value,montoTotal:document.getElementById('g-total-pagar').value,percepcionIVA:document.getElementById('g-perc-iva').value||0,percepcionIIBB:document.getElementById('g-perc-iibb').value||0,percepcionGanancias:document.getElementById('g-perc-gan').value||0,comprobante:document.getElementById('g-comprobante').value,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='gasto'){if(!gNatActual)return toast('Seleccioná si el gasto es Fijo o Variable',false);var concepto=document.getElementById('g-concepto').value.trim(),monto=document.getElementById('g-monto-gasto').value;if(!concepto||!monto)return toast('Completá concepto y monto',false);apiPost(gNatActual==='fijo'?'registrarGastoFijo':'registrarGastoVariable',{fecha:fecha,concepto:concepto,categoria:document.getElementById('g-cat-gasto').value,periodo:document.getElementById('g-periodo-gasto').value,monto:monto,proveedor:prov,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='envio'){var plat=document.getElementById('g-plataforma').value,mEnv=document.getElementById('g-monto-envio').value;if(!plat||!mEnv)return toast('Completá plataforma y monto',false);apiPost('registrarEnvio',{fecha:fecha,plataforma:plat,descripcion:document.getElementById('g-desc-envio').value,monto:mEnv,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='bien'){var cat=document.getElementById('g-cat-bien').value,desc=document.getElementById('g-desc-bien').value.trim(),mBien=document.getElementById('g-monto-bien').value;if(!cat||!desc||!mBien)return toast('Completá categoría, descripción y monto',false);apiPost('registrarBienDeUso',{fecha:fecha,categoria:cat,descripcion:desc,proveedor:prov,monto:mBien,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='alquiler'){var per=document.getElementById('g-periodo-alq').value.trim(),mAlq=document.getElementById('g-monto-alq').value;if(!per||!mAlq)return toast('Completá período y monto',false);apiPost('registrarAlquiler',{fecha:fecha,periodo:per,monto:mAlq,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}}
@@ -1895,10 +1932,11 @@ function prodInicializar() {
 }
 
 function prodTab(id, btn) {
-  ['listado','nuevo','precios'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
+  ['listado','nuevo','insumos','precios'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
   document.querySelectorAll('#panel-productos .gtab').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   if (id === 'precios') pbCargar();
+  if (id === 'insumos') insCargar();
 }
 
 function prodCargar() {
@@ -2132,6 +2170,105 @@ function prodEliminarProducto(nombre) {
 }
 
 // ============================================================
+// INSUMOS (fuente única de verdad)
+// ============================================================
+var _insCache = null;
+
+function insCargar() {
+  document.getElementById('ins-lista').innerHTML = '<div class="loading">Cargando insumos...</div>';
+  _insCache = null;
+  apiGet('insumos').then(function(data) {
+    _insCache = data || [];
+    // Sincronizar G_INSUMOS global
+    G_INSUMOS = _insCache.map(function(i){ return i.nombre; });
+    gInsumos  = G_INSUMOS.slice();
+    gLlenarInsumos();
+    insRender(_insCache);
+  }).catch(function(e) {
+    document.getElementById('ins-lista').innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  });
+}
+
+function insFiltrar() {
+  if (!_insCache) return;
+  var buscar = (document.getElementById('ins-buscar').value || '').toLowerCase().trim();
+  var filtrado = buscar ? _insCache.filter(function(i){ return i.nombre.toLowerCase().indexOf(buscar) >= 0 || (i.categoria||'').toLowerCase().indexOf(buscar) >= 0; }) : _insCache;
+  insRender(filtrado);
+}
+
+function insRender(lista) {
+  var cont = document.getElementById('ins-lista');
+  if (!lista || !lista.length) { cont.innerHTML = '<div class="loading" style="color:#8a7a5a">Sin insumos para mostrar.</div>'; return; }
+  // Agrupar por categoría
+  var grupos = {};
+  lista.forEach(function(i) {
+    var cat = i.categoria || 'Sin categoría';
+    if (!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(i);
+  });
+  var html = '';
+  Object.keys(grupos).sort().forEach(function(cat) {
+    html += '<div style="font-size:11px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 8px;padding-bottom:6px;border-bottom:2px solid #e8d9b8">' + cat + ' <span style="font-weight:400;color:#8a7a5a">(' + grupos[cat].length + ')</span></div>';
+    html += '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Nombre</th><th>Unidad por defecto</th><th style="width:140px;text-align:center">Acciones</th></tr></thead><tbody>';
+    grupos[cat].forEach(function(i) {
+      html += '<tr>' +
+        '<td style="font-weight:500;color:var(--verde)">' + i.nombre + '</td>' +
+        '<td>' + (i.unidad || '—') + '</td>' +
+        '<td style="text-align:center">' +
+          '<div style="display:flex;gap:6px;justify-content:center">' +
+            '<button onclick="insEditar(\'' + i.nombre.replace(/'/g,"\\'") + '\',\'' + (i.unidad||'') + '\',\'' + (i.categoria||'') + '\')" style="background:#f2f7e8;border:none;border-radius:6px;color:var(--verde);cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500">✏ Editar</button>' +
+            '<button onclick="insEliminar(\'' + i.nombre.replace(/'/g,"\\'") + '\')" style="background:#fff0f0;border:none;border-radius:6px;color:var(--rojo);cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500">🗑</button>' +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  });
+  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:10px">Total: ' + lista.length + ' insumos</div>';
+  cont.innerHTML = html;
+}
+
+function insEditar(nombre, unidad, categoria) {
+  document.getElementById('ins-nombre').value   = nombre;
+  document.getElementById('ins-unidad').value   = unidad || '';
+  document.getElementById('ins-categoria').value = categoria || '';
+  document.getElementById('ins-nombre').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast('Editando: ' + nombre + ' — modificá y guardá');
+}
+
+function insAgregar() {
+  var nombre    = document.getElementById('ins-nombre').value.trim().toUpperCase();
+  var unidad    = document.getElementById('ins-unidad').value;
+  var categoria = document.getElementById('ins-categoria').value;
+  if (!nombre) return toast('El nombre es obligatorio', false);
+  toast('Guardando...');
+  apiPost('agregarInsumo', { nombre: nombre, unidad: unidad, categoria: categoria }).then(function(r) {
+    if (r.ok) {
+      toast(r.accion === 'actualizado' ? 'Insumo actualizado ✓' : 'Insumo agregado ✓');
+      document.getElementById('ins-nombre').value = '';
+      document.getElementById('ins-unidad').value = '';
+      document.getElementById('ins-categoria').value = '';
+      _insCache = null;
+      insCargar();
+    } else toast('Error: ' + (r.msg || ''), false);
+  });
+}
+
+function insEliminar(nombre) {
+  if (!confirm('¿Eliminar el insumo "' + nombre + '"? Verificá que no esté en recetas activas.')) return;
+  apiPost('eliminarInsumo', { nombre: nombre }).then(function(r) {
+    if (r.ok) {
+      toast('Insumo eliminado ✓');
+      G_INSUMOS = G_INSUMOS.filter(function(i){ return i !== nombre; });
+      gInsumos  = G_INSUMOS.slice();
+      gLlenarInsumos();
+      _insCache = null;
+      insCargar();
+    } else toast('Error: ' + (r.msg || ''), false);
+  });
+}
+
+// ============================================================
 // PRECIOS DE REFERENCIA (PreciosBase)
 // ============================================================
 var _pbCache = null;
@@ -2141,12 +2278,22 @@ function pbCargar() {
   document.getElementById('pb-alerta-sinprecio').style.display = 'none';
   _pbCache = null;
 
-  // Poblar select de insumos con G_INSUMOS
+  // Poblar select de insumos con G_INSUMOS (dinámico desde API)
   var selIns = document.getElementById('pb-insumo');
   selIns.innerHTML = '<option value="">— Seleccioná —</option>';
-  G_INSUMOS.forEach(function(ins) {
+  var insParaPoblar = G_INSUMOS.length ? G_INSUMOS : [];
+  insParaPoblar.forEach(function(ins) {
     selIns.appendChild(new Option(ins, ins));
   });
+  // Si G_INSUMOS aún no cargó, cargarlo primero
+  if (!G_INSUMOS.length) {
+    apiGet('insumos').then(function(data) {
+      G_INSUMOS = (data || []).map(function(i){ return i.nombre; });
+      gInsumos  = G_INSUMOS.slice();
+      selIns.innerHTML = '<option value="">— Seleccioná —</option>';
+      G_INSUMOS.forEach(function(ins){ selIns.appendChild(new Option(ins, ins)); });
+    });
+  }
 
   // Cargar datos del GAS en paralelo: PreciosBase + Productos (para detectar sin precio)
   Promise.all([
