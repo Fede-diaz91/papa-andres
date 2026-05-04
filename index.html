@@ -705,7 +705,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
       <div style="background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:14px;margin-top:12px">
         <div style="font-size:11px;font-weight:600;color:var(--oliva);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">+ Agregar ingrediente</div>
         <div class="form-grid-2" style="margin-bottom:10px">
-          <div><label class="form-label">Insumo / Subreceta *</label><input type="text" id="ni-insumo" class="form-input" placeholder="Ej: QUESO MOZZARELLA" style="text-transform:uppercase"></div>
+          <div><label class="form-label">Insumo / Subreceta *</label><select id="ni-insumo" class="form-input"><option value="">— Seleccioná —</option></select></div>
           <div><label class="form-label">Tipo</label><select id="ni-tipo" class="form-input"><option value="NO">🧂 Ingrediente</option><option value="SI">🔄 Subreceta</option></select></div>
           <div><label class="form-label">Cantidad *</label><input type="number" id="ni-cantidad" class="form-input" min="0" step="0.001" placeholder="0.000"></div>
           <div><label class="form-label">Unidad</label><select id="ni-unidad" class="form-input"><option>KG</option><option>LT</option><option>UNIDAD</option><option>ATADO</option><option>OTROS</option></select></div>
@@ -1416,13 +1416,37 @@ function toggleGestionarPlat(){var sec=document.getElementById('gestionar-plat-s
 function cerrarGestionarPlat(){document.getElementById('gestionar-plat-section').style.display='none';}
 function renderGestionarPlat(){var html='';_plataformas.forEach(function(p){var esBase=parseFloat(p.id)<=4;html+='<div class="plat-item"><div><div class="plat-item-name">'+p.nombre+'</div></div>'+(esBase?'<span style="font-size:10px;color:#8a7a5a">Base</span>':'<button class="plat-item-remove" onclick="eliminarPlat('+p.id+',\''+p.nombre+'\')">✕</button>')+'</div>';});document.getElementById('plat-list').innerHTML=html||'<div style="font-size:12px;color:#8a7a5a;padding:8px">No hay plataformas adicionales.</div>';}
 function eliminarPlat(id,nombre){if(!confirm('¿Eliminar "'+nombre+'"?'))return;apiPost('eliminarPlataforma',{id:id}).then(function(r){if(r.ok){_plataformas=_plataformas.filter(function(p){return p.id!=id;});renderSelectPlataformas();renderGestionarPlat();toast('Eliminada ✓');}else toast('Error: '+(r.msg||''),false);});}
-function buildProductSelect(){var html='<option value="">— Seleccionar producto —</option>';Object.keys(CATALOGO).forEach(function(cat){html+='<optgroup label="'+cat+'">';CATALOGO[cat].forEach(function(prod){html+='<option value="'+prod+'">'+prod+'</option>';});html+='</optgroup>';});html+='<optgroup label="Otro"><option value="__otro__">Escribir producto...</option></optgroup>';return html;}
+function buildProductSelect(){
+  // Usar _prodCache si está disponible (dinámico desde API), sino caer al CATALOGO hardcodeado
+  var html='<option value="">— Seleccionar producto —</option>';
+  if (_prodCache && _prodCache.length) {
+    var grupos = {};
+    _prodCache.forEach(function(p){ if(!grupos[p.rubro]) grupos[p.rubro]=[]; grupos[p.rubro].push(p.nombre); });
+    Object.keys(grupos).sort().forEach(function(cat){
+      html+='<optgroup label="'+cat+'">';
+      grupos[cat].forEach(function(prod){ html+='<option value="'+prod+'">'+prod+'</option>'; });
+      html+='</optgroup>';
+    });
+  } else {
+    Object.keys(CATALOGO).forEach(function(cat){
+      html+='<optgroup label="'+cat+'">';
+      CATALOGO[cat].forEach(function(prod){ html+='<option value="'+prod+'">'+prod+'</option>'; });
+      html+='</optgroup>';
+    });
+  }
+  html+='<optgroup label="Otro"><option value="__otro__">Escribir producto...</option></optgroup>';
+  return html;
+}
 function agregarItemRow(){_itemCount++;var id=_itemCount;var div=document.createElement('div');div.className='item-row';div.id='item-row-'+id;div.innerHTML='<div><label class="form-label">Producto</label><select class="form-input" id="i-prod-'+id+'" onchange="onSeleccionarProducto('+id+')">'+buildProductSelect()+'</select><input type="text" class="form-input" id="i-prod-txt-'+id+'" placeholder="Escribir producto..." style="display:none;margin-top:4px"></div><div><label class="form-label">Cant.</label><input type="number" class="form-input" id="i-cant-'+id+'" value="1" min="1" oninput="calcItemSubtotal('+id+')"></div><div><label class="form-label">Precio unit. ($)</label><input type="number" class="form-input" id="i-precio-'+id+'" placeholder="0" oninput="calcItemSubtotal('+id+')"></div><div><label class="form-label">Subtotal</label><div class="item-subtotal" id="i-sub-'+id+'">$ 0</div></div><button class="item-remove" onclick="quitarItemRow('+id+')" title="Quitar">✕</button>';document.getElementById('items-list').appendChild(div);actualizarTotalManual();}
 function onSeleccionarProducto(id){var sel=document.getElementById('i-prod-'+id);var txt=document.getElementById('i-prod-txt-'+id);txt.style.display=sel.value==='__otro__'?'block':'none';if(sel.value!=='__otro__')txt.value='';}
 function calcItemSubtotal(id){var cant=parseFloat(document.getElementById('i-cant-'+id).value)||0;var precio=parseFloat(document.getElementById('i-precio-'+id).value)||0;document.getElementById('i-sub-'+id).textContent='$ '+Math.round(cant*precio).toLocaleString('es-AR');actualizarTotalManual();}
 function quitarItemRow(id){var row=document.getElementById('item-row-'+id);if(row)row.remove();actualizarTotalManual();}
 function actualizarTotalManual(){var totalItems=0;for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var cant=parseFloat(document.getElementById('i-cant-'+i)&&document.getElementById('i-cant-'+i).value)||0;var precio=parseFloat(document.getElementById('i-precio-'+i)&&document.getElementById('i-precio-'+i).value)||0;totalItems+=cant*precio;}var desc=parseFloat(document.getElementById('m-descuentos').value)||0;document.getElementById('m-total-display').textContent='$ '+Math.round(totalItems-desc).toLocaleString('es-AR');}
-function abrirCargaManual(){var hoy=new Date();var yy=hoy.getFullYear(),mm=String(hoy.getMonth()+1).padStart(2,'0'),dd=String(hoy.getDate()).padStart(2,'0');document.getElementById('m-fecha').value=yy+'-'+mm+'-'+dd;document.getElementById('m-descuentos').value='0';document.getElementById('items-list').innerHTML='';_itemCount=0;document.getElementById('nueva-plataforma-section').style.display='none';document.getElementById('gestionar-plat-section').style.display='none';document.getElementById('m-total-display').textContent='$ 0';document.getElementById('modal-overlay').style.display='block';document.getElementById('modal-manual').style.display='block';if(_plataformas.length===0)cargarPlataformas();agregarItemRow();}
+function abrirCargaManual(){var hoy=new Date();var yy=hoy.getFullYear(),mm=String(hoy.getMonth()+1).padStart(2,'0'),dd=String(hoy.getDate()).padStart(2,'0');document.getElementById('m-fecha').value=yy+'-'+mm+'-'+dd;document.getElementById('m-descuentos').value='0';document.getElementById('items-list').innerHTML='';_itemCount=0;document.getElementById('nueva-plataforma-section').style.display='none';document.getElementById('gestionar-plat-section').style.display='none';document.getElementById('m-total-display').textContent='$ 0';document.getElementById('modal-overlay').style.display='block';document.getElementById('modal-manual').style.display='block';if(_plataformas.length===0)cargarPlataformas();
+  // Asegurar que _prodCache esté disponible para el select dinámico
+  if (_prodCache && _prodCache.length) { agregarItemRow(); }
+  else { apiGet('productos').then(function(data){ _prodCache=data||[]; agregarItemRow(); }).catch(function(){ agregarItemRow(); }); }
+}
 function cerrarCargaManual(){document.getElementById('modal-manual').style.display='none';document.getElementById('modal-overlay').style.display='none';}
 function guardarVentaManual(){var mes=parseInt(document.getElementById('v-mes').value);var fechaInput=document.getElementById('m-fecha').value;var total=0;var items=[];for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var selProd=document.getElementById('i-prod-'+i);var txtProd=document.getElementById('i-prod-txt-'+i);var prod=selProd.value==='__otro__'?txtProd.value.trim():selProd.value;var cant=parseFloat(document.getElementById('i-cant-'+i).value)||1;var precio=parseFloat(document.getElementById('i-precio-'+i).value)||0;if(!prod||!precio)continue;items.push({producto:prod,cantidad:cant,precioUnit:precio,subtotal:cant*precio});total+=cant*precio;}if(!fechaInput||!items.length){toast('Completá fecha y al menos un producto con precio',false);return;}var partes=fechaInput.split('-');var fechaFmt=partes[2]+'/'+partes[1]+'/'+partes[0];var platSel=document.getElementById('m-plataforma');var platNombre=platSel.options[platSel.selectedIndex]?platSel.options[platSel.selectedIndex].text:'Manual';if(platSel.value==='nueva'){toast('Guardá primero la plataforma nueva',false);return;}var data={mes:MESES[mes].toLowerCase(),fecha:fechaFmt,plataforma:platNombre,metodo:document.getElementById('m-metodo').value,descuentos:parseFloat(document.getElementById('m-descuentos').value)||0,items:items};cerrarCargaManual();toast('Guardando...');apiPost('registrarVentaManual',data).then(function(r){if(r.ok){toast('Venta registrada ✓');cargarModuloVentas();}else toast('Error: '+(r.msg||''),false);});}
 
@@ -1907,7 +1931,7 @@ function prodRenderListado(lista) {
           '<span style="font-size:10px;color:#8a7a5a;font-weight:400"> / '+target+'%</span></td>'+
         '<td style="text-align:center;font-size:16px">'+semEmoji+'</td>'+
         '<td style="text-align:center"><span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:'+(p.enCarta?'#d1fae5':'#f5f5f5')+';color:'+(p.enCarta?'#065f46':'#8a7a5a')+'">'+(p.enCarta?'SI':'NO')+'</span></td>'+
-        '<td><button onclick="prodAbrirEditar(\''+p.nombre+'\')" style="background:#f2f7e8;border:none;border-radius:6px;color:var(--verde);cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500">✏ Editar</button></td>'+
+        '<td style="display:flex;gap:6px;justify-content:flex-end"><button onclick="prodAbrirEditar(\''+p.nombre+'\')" style="background:#f2f7e8;border:none;border-radius:6px;color:var(--verde);cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500">✏ Editar</button><button onclick="prodEliminarProducto(\''+p.nombre+'\')" style="background:#fff0f0;border:none;border-radius:6px;color:var(--rojo);cursor:pointer;padding:4px 10px;font-size:12px;font-weight:500">🗑 Eliminar</button></td>'+
       '</tr>';
     });
     html += '</tbody></table></div>';
@@ -1973,6 +1997,14 @@ function prodRenderReceta(p) {
   html += '</tbody><tfoot><tr style="background:var(--verde);color:var(--crema)"><td colspan="5" style="padding:7px 10px;font-weight:700">Costo total del plato</td>'+
     '<td class="num" style="font-weight:700;color:var(--crema)">'+fmt(p.costoCalculado)+'</td><td></td></tr></tfoot></table></div>';
   document.getElementById('ep-receta-lista').innerHTML = html;
+  // Poblar desplegable de insumos con G_INSUMOS + nombres de productos (subrecetas)
+  var selIns = document.getElementById('ni-insumo');
+  if (selIns && selIns.options.length <= 1) {
+    var optsIns = G_INSUMOS.map(function(ins){ return '<option value="'+ins+'">'+ins+'</option>'; }).join('');
+    var subrecetas = (_prodCache||[]).map(function(pr){ return pr.nombre; });
+    var optsSub = subrecetas.length ? '<optgroup label="— Subrecetas —">'+subrecetas.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join('')+'</optgroup>' : '';
+    selIns.innerHTML = '<option value="">— Seleccioná —</option><optgroup label="— Insumos —">'+optsIns+'</optgroup>'+optsSub;
+  }
 }
 
 function prodGuardarEdicion() {
@@ -2002,7 +2034,7 @@ function prodAgregarIngrediente() {
   }).then(function(r) {
     if (r.ok) {
       toast('Ingrediente agregado ✓');
-      document.getElementById('ni-insumo').value='';
+      document.getElementById('ni-insumo').innerHTML = '<option value="">— Seleccioná —</option>'; // forzar repoblado en próximo render
       document.getElementById('ni-cantidad').value='';
       _prodCache=null;
       apiGet('productos').then(function(data){
@@ -2044,6 +2076,17 @@ function prodGuardarNuevo() {
       _prodCache=null;
       // Ir al listado
       document.querySelectorAll('#panel-productos .gtab')[0].click();
+      prodCargar();
+    } else toast('Error: '+(r.msg||''), false);
+  });
+}
+
+function prodEliminarProducto(nombre) {
+  if (!confirm('¿Eliminar el producto "'+nombre+'" y toda su receta? Esta acción no se puede deshacer.')) return;
+  apiPost('eliminarProducto', { nombre: nombre }).then(function(r) {
+    if (r.ok) {
+      toast('Producto eliminado ✓');
+      _prodCache = null;
       prodCargar();
     } else toast('Error: '+(r.msg||''), false);
   });
