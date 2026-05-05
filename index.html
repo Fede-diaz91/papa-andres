@@ -841,8 +841,12 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
               <option value="margen">Margen $ (mayor a menor)</option>
               <option value="costoCalculado">Costo (menor a mayor)</option>
               <option value="precioVenta">Precio de venta</option>
+              <option value="unidadesVendidas">🏆 Ranking ventas del mes</option>
             </select></div>
+          <div><label class="form-label">Mes de ventas</label>
+            <select id="am-mes" class="form-input" onchange="amCargar()"></select></div>
           <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amCargar()">↺ Actualizar</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amAbrirSimulador()">🧮 Simulador</button>
           <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amExportarHTML()">🖨 Reporte HTML</button>
         </div>
       </div>
@@ -851,6 +855,60 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
   </div>
   <div id="panel-rep-stock" class="panel"><div class="loading">Cargando reporte...</div></div>
 </main>
+
+<!-- Modal Simulador de Contribución Marginal -->
+<div id="sim-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.45);z-index:300"></div>
+<div id="sim-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:94%;max-width:680px;max-height:90vh;overflow-y:auto;background:#fdf8f0;border:1.5px solid #e0d0b0;border-radius:14px;padding:24px;z-index:301;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+    <div style="font-size:13px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.5px">🧮 Simulador de Contribución Marginal</div>
+    <span style="cursor:pointer;color:#8a7a5a;font-size:18px" onclick="simCerrar()">✕</span>
+  </div>
+  <!-- Selector de producto -->
+  <div style="margin-bottom:16px">
+    <label class="form-label">Producto</label>
+    <select id="sim-producto" class="form-input" onchange="simCargarProducto()">
+      <option value="">— Seleccioná un producto —</option>
+    </select>
+  </div>
+  <!-- Panel resultado (oculto hasta seleccionar) -->
+  <div id="sim-panel" style="display:none">
+    <!-- Costo fijo del producto -->
+    <div style="background:#f5f0e8;border:1px solid #e8d9b8;border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:600;color:#8a7a5a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Costo del plato (fijo)</div>
+      <div style="font-size:22px;font-weight:700;color:var(--verde)" id="sim-costo">$ 0</div>
+      <div style="font-size:11px;color:#8a7a5a;margin-top:4px" id="sim-ingredientes-resumen"></div>
+    </div>
+    <!-- Slider precio de venta -->
+    <div style="background:#fff;border:1px solid #e8d9b8;border-radius:10px;padding:16px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <label class="form-label" style="margin:0">Precio de venta simulado</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:#8a7a5a">$</span>
+          <input type="number" id="sim-precio-input" class="form-input" style="width:120px;font-weight:700;font-size:15px" min="0" step="100" oninput="simActualizar()">
+        </div>
+      </div>
+      <input type="range" id="sim-precio-slider" style="width:100%;accent-color:var(--verde)" min="0" max="50000" step="100" oninput="simSyncSlider()">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#8a7a5a;margin-top:4px">
+        <span>$ 0</span><span id="sim-slider-max">$ 50.000</span>
+      </div>
+    </div>
+    <!-- KPIs resultado -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div class="kpi"><div class="kpi-label">Margen $</div><div class="kpi-value" id="sim-margen-$" style="font-size:20px">$ 0</div></div>
+      <div class="kpi"><div class="kpi-label">Margen %</div><div class="kpi-value" id="sim-margen-%" style="font-size:20px">0%</div></div>
+      <div class="kpi"><div class="kpi-label">Food cost %</div><div class="kpi-value" id="sim-fc" style="font-size:20px">0%</div></div>
+      <div class="kpi"><div class="kpi-label">Contribución marginal</div><div class="kpi-value" id="sim-cm" style="font-size:20px">$ 0</div></div>
+    </div>
+    <!-- Semáforo visual -->
+    <div id="sim-semaforo" style="border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;text-align:center;margin-bottom:14px"></div>
+    <!-- Precio sugerido -->
+    <div style="background:#e8f0c8;border:1px solid #c8dfa0;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--oliva)">
+      💡 <strong>Precio sugerido</strong> para llegar al food cost objetivo (<span id="sim-target-pct">30</span>%): 
+      <strong id="sim-precio-sugerido" style="font-size:14px">$ 0</strong>
+      <button onclick="simAplicarSugerido()" style="margin-left:10px;background:var(--oliva);color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600">Aplicar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal carga manual ventas -->
 <div id="modal-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.35);z-index:200"></div>
@@ -2412,12 +2470,43 @@ function pbEliminar(insumo) {
 var _amData = null;
 
 function amCargar() {
+  // Poblar selector de mes si está vacío
+  var selMes = document.getElementById('am-mes');
+  if (!selMes.options.length) {
+    MESES.slice(1).forEach(function(m, i) {
+      var opt = new Option(m, i+1);
+      if (i+1 === mesActivo) opt.selected = true;
+      selMes.appendChild(opt);
+    });
+  }
+  var mes = parseInt(selMes.value) || mesActivo;
+
   document.getElementById('am-contenido').innerHTML='<div class="loading">Calculando márgenes...</div>';
   _amData = null;
-  apiGet('analisisMarginal').then(function(data){
-    _amData = data;
-    // Poblar selector rubros
+
+  // Cargar análisis marginal + ventas del mes en paralelo
+  Promise.all([
+    apiGet('analisisMarginal'),
+    apiGet('ventasHistorialProductos', { mes: mes, anio: anioActivo })
+  ]).then(function(results) {
+    var data     = results[0];
+    var ventasMes = results[1] || [];
+
+    // Construir mapa de unidades vendidas por producto
+    var mapaVentas = {};
+    ventasMes.forEach(function(v) {
+      var nom = String(v.Producto || v.producto || '').trim().toUpperCase();
+      var cant = parseFloat(v.Cantidad || v.cantidad) || 0;
+      if (!nom) return;
+      mapaVentas[nom] = (mapaVentas[nom] || 0) + cant;
+    });
+
+    // Inyectar unidadesVendidas en cada producto
     if (data && data.productos) {
+      data.productos.forEach(function(p) {
+        p.unidadesVendidas = mapaVentas[p.nombre.toUpperCase()] || 0;
+      });
+      _amData = data;
       var rubros = [...new Set(data.productos.map(function(p){return p.rubro;}))].sort();
       var sel = document.getElementById('am-rubro');
       sel.innerHTML = '<option value="">Todos los rubros</option>';
@@ -2433,13 +2522,14 @@ function amFiltrar() {
   var orden  = document.getElementById('am-orden').value;
   var lista  = _amData.productos.filter(function(p){ return !rubro || p.rubro===rubro; });
   lista.sort(function(a,b){
-    if (orden==='costoCalculado') return a[orden]-b[orden];
-    return b[orden]-a[orden];
+    if (orden === 'costoCalculado') return a[orden] - b[orden];
+    if (orden === 'unidadesVendidas') return (b.unidadesVendidas||0) - (a.unidadesVendidas||0);
+    return b[orden] - a[orden];
   });
-  amRender(lista);
+  amRender(lista, orden === 'unidadesVendidas');
 }
 
-function amRender(lista) {
+function amRender(lista, modoVentas) {
   var cont = document.getElementById('am-contenido');
   if (!lista||!lista.length){ cont.innerHTML='<div class="loading">Sin datos.</div>'; return; }
   var fmt = function(n){ return '$\u00a0'+Math.round(n||0).toLocaleString('es-AR'); };
@@ -2447,27 +2537,35 @@ function amRender(lista) {
   // KPIs
   var avgMargen = lista.reduce(function(s,p){return s+p.margenPct;},0)/lista.length;
   var avgFC     = lista.reduce(function(s,p){return s+p.foodCostReal;},0)/lista.length;
-  var mejorProd = lista[0];
+  var mejorProd = lista.slice().sort(function(a,b){return b.margenPct-a.margenPct;})[0];
   var peorIdx   = lista.slice().sort(function(a,b){return a.margenPct-b.margenPct;})[0];
+
+  // En modo ventas: KPI de total unidades vendidas
+  var totalUnidades = modoVentas ? lista.reduce(function(s,p){return s+(p.unidadesVendidas||0);},0) : 0;
 
   var kpis = '<div class="kpi-grid" style="margin-bottom:20px">'+
     '<div class="kpi"><div class="kpi-label">Margen promedio</div><div class="kpi-value" style="color:var(--oliva)">'+avgMargen.toFixed(1)+'%</div></div>'+
     '<div class="kpi"><div class="kpi-label">Food cost promedio</div><div class="kpi-value">'+avgFC.toFixed(1)+'%</div></div>'+
     '<div class="kpi"><div class="kpi-label">Mayor margen</div><div class="kpi-value" style="color:var(--oliva);font-size:14px">'+mejorProd.nombre+'</div><div class="kpi-delta up">'+mejorProd.margenPct.toFixed(1)+'% — '+fmt(mejorProd.margen)+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Menor margen</div><div class="kpi-value" style="color:var(--rojo);font-size:14px">'+peorIdx.nombre+'</div><div class="kpi-delta down">'+peorIdx.margenPct.toFixed(1)+'% — '+fmt(peorIdx.margen)+'</div></div>'+
+    (modoVentas ? '<div class="kpi"><div class="kpi-label">Total unidades vendidas</div><div class="kpi-value">'+totalUnidades.toLocaleString('es-AR')+'</div></div>' : '')+
   '</div>';
 
-  // Tabla ranking
+  // Tabla
   var maxMargen = Math.max.apply(null, lista.map(function(p){return p.margenPct;}));
-  var html = '<div class="card"><div class="card-title">Ranking de contribución marginal</div>'+
+  var maxUnidades = modoVentas ? Math.max.apply(null, lista.map(function(p){return p.unidadesVendidas||0;})) : 0;
+
+  var html = '<div class="card"><div class="card-title">'+(modoVentas?'🏆 Ranking por ventas del mes':'Ranking de contribución marginal')+'</div>'+
     '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
     '<th>#</th><th>Producto</th><th>Rubro</th>'+
+    (modoVentas ? '<th style="text-align:right">Unidades</th><th style="min-width:100px">Volumen</th>' : '')+
     '<th style="text-align:right">Precio venta</th>'+
     '<th style="text-align:right">Costo</th>'+
     '<th style="text-align:right">Margen $</th>'+
     '<th style="text-align:right">Margen %</th>'+
-    '<th style="text-align:right">Food cost %</th>'+
-    '<th style="min-width:120px">Barra</th>'+
+    '<th style="text-align:right">Food cost</th>'+
+    (!modoVentas ? '<th style="min-width:120px">Barra</th>' : '')+
+    '<th style="width:40px"></th>'+
     '</tr></thead><tbody>';
 
   lista.forEach(function(p, i) {
@@ -2477,27 +2575,153 @@ function amRender(lista) {
     var barPct = maxMargen>0 ? Math.max(Math.round((p.margenPct/maxMargen)*100),2) : 2;
     var barColor = p.margenPct >= avgMargen ? '#657a2d' : '#f4a21d';
     var medallon = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
+    var unidades = p.unidadesVendidas || 0;
+    var barVentasPct = maxUnidades > 0 ? Math.max(Math.round((unidades/maxUnidades)*100), unidades>0?3:0) : 0;
 
     html += '<tr>'+
       '<td style="font-weight:600;color:#8a7a5a">'+medallon+'</td>'+
       '<td style="font-weight:500;color:var(--verde)">'+p.nombre+'</td>'+
       '<td style="color:#8a7a5a;font-size:11px">'+p.rubro+'</td>'+
+      (modoVentas ? '<td class="num" style="font-weight:700;color:'+(unidades>0?'var(--verde)':'#ccc')+'">'+unidades+'</td>'+
+        '<td><div style="background:#f0e4cc;border-radius:4px;height:8px;overflow:hidden"><div style="width:'+barVentasPct+'%;height:100%;background:#657a2d;border-radius:4px"></div></div></td>' : '')+
       '<td class="num">'+fmt(p.precioVenta)+'</td>'+
       '<td class="num">'+fmt(p.costoCalculado)+'</td>'+
       '<td class="num" style="font-weight:600;color:'+(p.margen>0?'var(--oliva)':'var(--rojo)')+'">'+fmt(p.margen)+'</td>'+
       '<td class="num" style="font-weight:700;color:'+(p.margenPct>0?'var(--oliva)':'var(--rojo)')+'">'+p.margenPct.toFixed(1)+'%</td>'+
       '<td class="num" style="color:'+semColor+';font-weight:600">'+fc.toFixed(1)+'%</td>'+
-      '<td><div style="background:#f0e4cc;border-radius:4px;height:8px;overflow:hidden"><div style="width:'+barPct+'%;height:100%;background:'+barColor+';border-radius:4px"></div></div></td>'+
+      (!modoVentas ? '<td><div style="background:#f0e4cc;border-radius:4px;height:8px;overflow:hidden"><div style="width:'+barPct+'%;height:100%;background:'+barColor+';border-radius:4px"></div></div></td>' : '')+
+      '<td><button onclick="amAbrirSimulador(\''+p.nombre.replace(/'/g,"\\'")+'\')" title="Simular" style="background:#f2f7e8;border:none;border-radius:5px;color:var(--verde);cursor:pointer;padding:3px 8px;font-size:13px">🧮</button></td>'+
     '</tr>';
   });
   html += '</tbody></table></div></div>';
 
-  // Nota
   var nota = '<div style="background:#fdf8f0;border:1px solid #e8d9b8;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:11px;color:#8a7a5a">'+
-    'ℹ️ Los costos se calculan con el precio de la <strong>última compra registrada</strong> de cada insumo. El precio de venta proviene de las <strong>ventas reales importadas</strong> (subtotal ÷ unidades) o del valor manual en la hoja Productos. Actualizá las compras para mantener los costos al día.'+
+    'ℹ️ Los costos se calculan con el precio de la <strong>última compra registrada</strong>. El precio de venta proviene de las <strong>ventas reales</strong> o del valor manual. Las unidades vendidas corresponden al mes seleccionado.'+
   '</div>';
 
   cont.innerHTML = kpis + html + nota;
+}
+
+// ============================================================
+// SIMULADOR DE CONTRIBUCIÓN MARGINAL
+// ============================================================
+var _simProducto = null;
+
+function amAbrirSimulador(nombrePresel) {
+  // Poblar select de productos desde _amData o _prodCache
+  var sel = document.getElementById('sim-producto');
+  sel.innerHTML = '<option value="">— Seleccioná un producto —</option>';
+  var fuente = (_amData && _amData.productos) ? _amData.productos : (_prodCache || []);
+  fuente.forEach(function(p) {
+    sel.appendChild(new Option(p.nombre, p.nombre));
+  });
+  document.getElementById('sim-panel').style.display = 'none';
+  document.getElementById('sim-overlay').style.display = 'block';
+  document.getElementById('sim-modal').style.display   = 'block';
+  if (nombrePresel) {
+    sel.value = nombrePresel;
+    simCargarProducto();
+  }
+}
+
+function simCerrar() {
+  document.getElementById('sim-modal').style.display   = 'none';
+  document.getElementById('sim-overlay').style.display = 'none';
+  _simProducto = null;
+}
+
+function simCargarProducto() {
+  var nombre = document.getElementById('sim-producto').value;
+  if (!nombre) { document.getElementById('sim-panel').style.display = 'none'; return; }
+  var fuente = (_amData && _amData.productos) ? _amData.productos : (_prodCache || []);
+  var prod = fuente.find(function(p){ return p.nombre === nombre; });
+  if (!prod) return;
+  _simProducto = prod;
+
+  var fmt = function(n){ return '$ ' + Math.round(n||0).toLocaleString('es-AR'); };
+  document.getElementById('sim-costo').textContent = fmt(prod.costoCalculado);
+
+  // Resumen ingredientes
+  var ing = (prod.ingredientes||[]).map(function(i){ return i.cantidad + ' ' + i.unidad + ' ' + i.insumo; }).join(' · ');
+  document.getElementById('sim-ingredientes-resumen').textContent = ing || 'Sin ingredientes cargados';
+
+  // Configurar slider
+  var precioActual = prod.precioVenta || 0;
+  var maxSlider = Math.max(precioActual * 2.5, prod.costoCalculado * 5, 10000);
+  maxSlider = Math.ceil(maxSlider / 1000) * 1000;
+  document.getElementById('sim-precio-slider').max = maxSlider;
+  document.getElementById('sim-slider-max').textContent = '$ ' + maxSlider.toLocaleString('es-AR');
+  document.getElementById('sim-precio-slider').value = precioActual;
+  document.getElementById('sim-precio-input').value  = precioActual;
+  document.getElementById('sim-target-pct').textContent = prod.foodCostTarget || 30;
+
+  var sugerido = prod.foodCostTarget > 0 ? Math.round(prod.costoCalculado / (prod.foodCostTarget / 100)) : 0;
+  document.getElementById('sim-precio-sugerido').textContent = fmt(sugerido);
+
+  document.getElementById('sim-panel').style.display = 'block';
+  simActualizar();
+}
+
+function simSyncSlider() {
+  var val = parseFloat(document.getElementById('sim-precio-slider').value) || 0;
+  document.getElementById('sim-precio-input').value = val;
+  simActualizar();
+}
+
+function simActualizar() {
+  if (!_simProducto) return;
+  var precio = parseFloat(document.getElementById('sim-precio-input').value) || 0;
+  document.getElementById('sim-precio-slider').value = precio;
+
+  var costo  = _simProducto.costoCalculado || 0;
+  var target = _simProducto.foodCostTarget || 30;
+  var margen$ = precio - costo;
+  var margenPct = precio > 0 ? (margen$ / precio) * 100 : 0;
+  var fc        = precio > 0 ? (costo / precio) * 100 : 0;
+  var cm        = margen$; // contribución marginal = precio - costo variable
+
+  var fmt = function(n){ return '$ ' + Math.round(n||0).toLocaleString('es-AR'); };
+
+  document.getElementById('sim-margen-$').textContent = fmt(margen$);
+  document.getElementById('sim-margen-%').textContent = margenPct.toFixed(1) + '%';
+  document.getElementById('sim-fc').textContent       = fc.toFixed(1) + '%';
+  document.getElementById('sim-cm').textContent       = fmt(cm);
+
+  // Colores dinámicos
+  var colorMargen = margen$ >= 0 ? 'var(--oliva)' : 'var(--rojo)';
+  document.getElementById('sim-margen-$').style.color = colorMargen;
+  document.getElementById('sim-margen-%').style.color = colorMargen;
+
+  var colorFC = fc <= target ? 'var(--oliva)' : fc <= target * 1.2 ? 'var(--amarillo)' : 'var(--rojo)';
+  document.getElementById('sim-fc').style.color = colorFC;
+
+  // Semáforo
+  var sem = document.getElementById('sim-semaforo');
+  if (precio === 0) {
+    sem.style.background = '#f5f0e8'; sem.style.color = '#8a7a5a';
+    sem.textContent = 'Ingresá un precio para ver el análisis';
+  } else if (fc <= target) {
+    sem.style.background = '#d1fae5'; sem.style.color = '#065f46';
+    sem.textContent = '🟢 Precio rentable — food cost dentro del objetivo (' + fc.toFixed(1) + '% ≤ ' + target + '%)';
+  } else if (fc <= target * 1.2) {
+    sem.style.background = '#fef3c7'; sem.style.color = '#92400e';
+    sem.textContent = '🟡 Precio límite — food cost levemente sobre el objetivo (' + fc.toFixed(1) + '% vs ' + target + '%)';
+  } else {
+    sem.style.background = '#fff0f0'; sem.style.color = '#d61220';
+    sem.textContent = '🔴 Precio bajo — food cost sobre el objetivo (' + fc.toFixed(1) + '% vs ' + target + '%)';
+  }
+
+  // Actualizar precio sugerido
+  var sugerido = target > 0 ? Math.round(costo / (target / 100)) : 0;
+  document.getElementById('sim-precio-sugerido').textContent = fmt(sugerido);
+}
+
+function simAplicarSugerido() {
+  if (!_simProducto) return;
+  var target   = _simProducto.foodCostTarget || 30;
+  var sugerido = target > 0 ? Math.round(_simProducto.costoCalculado / (target / 100)) : 0;
+  document.getElementById('sim-precio-input').value = sugerido;
+  simActualizar();
 }
 
 function amExportarHTML() {
