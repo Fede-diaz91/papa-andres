@@ -2108,31 +2108,45 @@ function cerrarModalProd() {
 
 function prodRenderReceta(p) {
   var fmt = function(n){ return '$\u00a0'+Math.round(n||0).toLocaleString('es-AR'); };
+  var fmtDec = function(n){ return '$\u00a0'+(n||0).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:2}); };
   var ing = p.ingredientes || [];
   if (!ing.length) { document.getElementById('ep-receta-lista').innerHTML='<div style="color:#8a7a5a;font-size:12px;padding:8px 0">Sin ingredientes cargados.</div>'; return; }
   var html = '<div class="g-tabla-wrap"><table class="g-tabla" style="font-size:11px"><thead><tr>'+
     '<th>Tipo</th><th>Insumo / Subreceta</th><th style="text-align:right">Cantidad</th><th>Unidad</th>'+
     '<th style="text-align:right">Costo unit.</th><th style="text-align:right">Costo línea</th><th style="width:36px"></th></tr></thead><tbody>';
-  var totalCosto = 0;
   ing.forEach(function(i) {
     var esSub = i.esSubreceta;
     var bg = esSub ? '#fdf8f0' : '#fff';
-    // Para mostrar costo: usar costoCalculado proporcional no está disponible por ítem,
-    // pero podemos mostrar que es subreceta
+    var sinPrecio = !esSub && (!i.costoUnit || i.costoUnit === 0);
+    var costoUnitStr = esSub
+      ? '<span style="color:#1e40af;font-size:10px">calculado</span>'
+      : sinPrecio
+        ? '<span style="color:var(--rojo);font-size:10px;font-weight:600">⚠ sin precio</span>'
+        : fmtDec(i.costoUnit);
+    var costoLineaStr = (i.costoLinea && i.costoLinea > 0) ? fmt(i.costoLinea) : '<span style="color:#ccc">—</span>';
+
     html += '<tr style="background:'+bg+'">'+
       '<td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:'+(esSub?'#dbeafe':'#f0e4cc')+';color:'+(esSub?'#1e40af':'#8a7a5a')+'">'+(esSub?'🔄 Sub':'🧂 Ing')+'</span></td>'+
-      '<td style="font-weight:500;color:var(--verde)">'+i.insumo+'</td>'+
+      '<td style="font-weight:500;color:'+(sinPrecio?'var(--rojo)':'var(--verde)')+'">'+i.insumo+(sinPrecio?' <span style="font-size:9px;font-weight:400">(sin precio)</span>':'')+'</td>'+
       '<td class="num">'+i.cantidad+'</td>'+
       '<td>'+i.unidad+'</td>'+
-      '<td class="num" style="color:#8a7a5a">—</td>'+
-      '<td class="num" style="color:#8a7a5a">—</td>'+
+      '<td class="num">'+costoUnitStr+'</td>'+
+      '<td class="num" style="font-weight:600">'+costoLineaStr+'</td>'+
       '<td><button onclick="prodEliminarIngrediente('+i._rowIndex+',\''+i.insumo+'\')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td>'+
     '</tr>';
   });
   html += '</tbody><tfoot><tr style="background:var(--verde);color:var(--crema)"><td colspan="5" style="padding:7px 10px;font-weight:700">Costo total del plato</td>'+
     '<td class="num" style="font-weight:700;color:var(--crema)">'+fmt(p.costoCalculado)+'</td><td></td></tr></tfoot></table></div>';
+
+  // Alerta si hay ingredientes sin precio
+  var sinPrecio = ing.filter(function(i){ return i.sinPrecio; });
+  if (sinPrecio.length) {
+    html += '<div style="background:#fff3cd;border:1px solid #f4a21d;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:11px;color:#856404">'+
+      '⚠ Ingredientes sin precio: <strong>'+sinPrecio.map(function(i){return i.insumo;}).join(', ')+'</strong> — cargalos en 💲 Precios de referencia</div>';
+  }
+
   document.getElementById('ep-receta-lista').innerHTML = html;
-  // Poblar desplegable de insumos con G_INSUMOS + nombres de productos (subrecetas)
+  // Poblar desplegable de insumos
   var selIns = document.getElementById('ni-insumo');
   if (selIns && selIns.options.length <= 1) {
     var optsIns = G_INSUMOS.map(function(ins){ return '<option value="'+ins+'">'+ins+'</option>'; }).join('');
