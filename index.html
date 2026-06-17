@@ -1623,8 +1623,7 @@ function vBorrarSelectivo(){
   var tipoBorrar=document.getElementById('vh-tipo-borrar').value;
   if(!mes) return toast('Seleccioná un mes antes de borrar',false);
   var confirmMsg='¿Borrar ventas de '+MESES[parseInt(mes)]+(canal?' del canal "'+canal+'"':' (todos los canales)')+'?';
-  if(!confirm(confirmMsg+'
-Esta acción no se puede deshacer.')) return;
+  if(!confirm(confirmMsg+'\nEsta acción no se puede deshacer.')) return;
   
   // Filtrar filas a borrar: solo las del cache actual que coincidan con canal
   var filasABorrar=_vHistorialCache||[];
