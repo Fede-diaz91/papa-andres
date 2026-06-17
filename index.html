@@ -651,6 +651,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
         <button class="gtab" onclick="prodTab('nuevo',this)">➕ Nuevo producto</button>
         <button class="gtab" onclick="prodTab('insumos',this)">🧂 Insumos</button>
         <button class="gtab" onclick="prodTab('precios',this)">💲 Precios de referencia</button>
+        <button class="gtab" onclick="prodTab('subrecetas',this)">🔄 Subrecetas</button>
       </div>
       <!-- LISTADO -->
       <div id="prodtab-listado">
@@ -733,6 +734,20 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
           </div>
           <!-- Tabla -->
           <div id="ins-lista"><div class="loading">Cargando...</div></div>
+        </div>
+      </div>
+      <!-- SUBRECETAS -->
+      <div id="prodtab-subrecetas" style="display:none">
+        <div class="card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Subrecetas</span>
+            <button class="btn btn-secondary btn-sm" onclick="subCargar()">↺ Actualizar</button>
+          </div>
+          <p style="font-size:12px;color:#8a7a5a;margin-bottom:14px;line-height:1.6">
+            Las subrecetas son preparaciones intermedias (masas, salsas, rellenos) que se usan como ingredientes en otras recetas. 
+            El <strong>rendimiento</strong> indica cuántas unidades o kg produce un batch completo.
+          </p>
+          <div id="sub-lista"><div class="loading">Cargando subrecetas...</div></div>
         </div>
       </div>
       <!-- PRECIOS DE REFERENCIA -->
@@ -2215,11 +2230,12 @@ function prodInicializar() {
 }
 
 function prodTab(id, btn) {
-  ['listado','nuevo','insumos','precios'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
+  ['listado','nuevo','insumos','precios','subrecetas'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
   document.querySelectorAll('#panel-productos .gtab').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   if (id === 'precios') pbCargar();
   if (id === 'insumos') insCargar();
+  if (id === 'subrecetas') subCargar();
 }
 
 function prodCargar() {
@@ -3657,6 +3673,137 @@ function erExportarHTML() {
   w.document.write(html);
   w.document.close();
   toast('Reporte HTML abierto en nueva pestaña ✓');
+}
+
+// ============================================================
+// SUBRECETAS
+// ============================================================
+var _subCache = null;
+
+function subCargar() {
+  var cont = document.getElementById('sub-lista');
+  cont.innerHTML = '<div class="loading">Cargando subrecetas...</div>';
+  _subCache = null;
+  // Necesitamos subrecetas (rendimientos) + recetas (ingredientes de cada subreceta)
+  // Las subrecetas se obtienen de la acción 'subrecetas' del GAS
+  // Los ingredientes vienen embebidos en _prodCache via la acción 'productos'
+  Promise.all([
+    apiGet('subrecetas'),
+    _prodCache ? Promise.resolve(_prodCache) : apiGet('productos')
+  ]).then(function(results) {
+    var subs = results[0] || [];
+    var prods = results[1] || [];
+    if (!_prodCache) _prodCache = prods;
+    _subCache = subs;
+    subRender(subs, prods);
+  }).catch(function(e) {
+    cont.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
+  });
+}
+
+function subRender(subs, prods) {
+  var cont = document.getElementById('sub-lista');
+  if (!subs.length) {
+    cont.innerHTML = '<div class="loading" style="color:#8a7a5a">No hay subrecetas cargadas.</div>';
+    return;
+  }
+
+  // Construir mapa de recetas de cada subreceta desde _prodCache
+  // En el sistema, las subrecetas aparecen como productos con sus ingredientes
+  var recetaMapa = {};
+  prods.forEach(function(p) {
+    recetaMapa[p.nombre.toUpperCase()] = p.ingredientes || [];
+  });
+
+  var fmt = function(n) { return '$ ' + Math.round(n||0).toLocaleString('es-AR'); };
+  var fmtDec = function(n) { return (n||0).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:3}); };
+
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>' +
+    '<th style="width:36px"></th>' +
+    '<th>Subreceta</th>' +
+    '<th style="text-align:right">Rendimiento</th>' +
+    '<th>Unidad batch</th>' +
+    '<th style="text-align:right">Costo batch</th>' +
+    '<th style="text-align:right">Costo unitario</th>' +
+    '<th style="text-align:right">Ingredientes</th>' +
+    '</tr></thead><tbody>';
+
+  subs.forEach(function(s, idx) {
+    var nombre = String(s.nombre || '').toUpperCase();
+    var rinde = parseFloat(s.rendimiento) || 1;
+    var unidad = s.unidad || '';
+    var ings = recetaMapa[nombre] || [];
+    var costoBatch = ings.reduce(function(sum, i) { return sum + (i.costoLinea || 0); }, 0);
+    var costoUnit = rinde > 0 ? costoBatch / rinde : 0;
+    var rowId = 'sub-row-' + idx;
+    var detailId = 'sub-detail-' + idx;
+    var hasIngs = ings.length > 0;
+
+    var onclickAttr = hasIngs ? 'subToggleDetalle(\'' + detailId + '\')' : '';
+    html += '<tr id="' + rowId + '" style="cursor:' + (hasIngs?'pointer':'default') + '" onclick="' + onclickAttr + '">' +
+      '<td style="text-align:center;font-size:11px;color:#8a7a5a">' + (hasIngs ? '▶' : '') + '</td>' +
+      '<td style="font-weight:600;color:var(--verde)">' + s.nombre + '</td>' +
+      '<td class="num" style="font-weight:700">' + fmtDec(rinde) + '</td>' +
+      '<td style="color:#8a7a5a">' + unidad + '</td>' +
+      '<td class="num">' + (costoBatch > 0 ? fmt(costoBatch) : '<span style="color:#ccc">—</span>') + '</td>' +
+      '<td class="num" style="font-weight:600;color:var(--oliva)">' + (costoUnit > 0 ? fmt(costoUnit) : '<span style="color:#ccc">—</span>') + '</td>' +
+      '<td class="num" style="color:#8a7a5a">' + (hasIngs ? ings.length + ' ítem' + (ings.length!==1?'s':'') : '<span style="color:#ccc">sin receta</span>') + '</td>' +
+    '</tr>';
+
+    if (hasIngs) {
+      html += '<tr id="' + detailId + '" style="display:none"><td colspan="7" style="padding:0">' +
+        '<div style="background:#f5f0e8;border-left:3px solid var(--verde);padding:12px 16px;margin:0">' +
+        '<div style="font-size:10px;font-weight:600;color:var(--verde);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">📋 Ingredientes del batch</div>' +
+        '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+        '<thead><tr>' +
+        '<th style="text-align:left;padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Insumo</th>' +
+        '<th style="text-align:right;padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Cantidad</th>' +
+        '<th style="padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Unidad</th>' +
+        '<th style="text-align:right;padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Costo unit.</th>' +
+        '<th style="text-align:right;padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Subtotal</th>' +
+        '</tr></thead><tbody>';
+      ings.forEach(function(i) {
+        var sinPrecio = !i.costoUnit || i.costoUnit === 0;
+        html += '<tr>' +
+          '<td style="padding:5px 8px;font-weight:500;color:' + (sinPrecio?'var(--rojo)':'var(--verde)') + '">' +
+            (i.esSubreceta ? '🔄 ' : '🧂 ') + i.insumo +
+            (sinPrecio ? ' <span style="font-size:9px;color:var(--rojo)">(sin precio)</span>' : '') +
+          '</td>' +
+          '<td style="padding:5px 8px;text-align:right">' + fmtDec(i.cantidad) + '</td>' +
+          '<td style="padding:5px 8px;color:#8a7a5a">' + (i.unidad||'') + '</td>' +
+          '<td style="padding:5px 8px;text-align:right;color:#8a7a5a">' + (sinPrecio ? '—' : fmt(i.costoUnit)) + '</td>' +
+          '<td style="padding:5px 8px;text-align:right;font-weight:600">' + (i.costoLinea > 0 ? fmt(i.costoLinea) : '—') + '</td>' +
+        '</tr>';
+      });
+      html += '</tbody><tfoot><tr style="background:#e8f0c8">' +
+        '<td colspan="4" style="padding:6px 8px;font-weight:700;color:var(--verde)">Costo batch total</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--verde)">' + fmt(costoBatch) + '</td>' +
+        '</tr>' +
+        '<tr style="background:#d4e8a0">' +
+        '<td colspan="4" style="padding:6px 8px;font-weight:700;color:var(--verde)">Costo por ' + unidad.toLowerCase() + ' (÷ ' + fmtDec(rinde) + ')</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--verde)">' + fmt(costoUnit) + '</td>' +
+        '</tr></tfoot></table></div>' +
+      '</td></tr>';
+    }
+  });
+
+  html += '</tbody></table></div>';
+  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">' + subs.length + ' subrecetas · Hacé clic en cada fila para ver los ingredientes</div>';
+  cont.innerHTML = html;
+}
+
+function subToggleDetalle(id) {
+  var row = document.getElementById(id);
+  if (!row) return;
+  var visible = row.style.display !== 'none';
+  row.style.display = visible ? 'none' : '';
+  // Rotar el ▶ de la fila padre
+  var idx = id.replace('sub-detail-', '');
+  var parentRow = document.getElementById('sub-row-' + idx);
+  if (parentRow) {
+    var arrow = parentRow.querySelector('td:first-child');
+    if (arrow) arrow.textContent = visible ? '▶' : '▼';
+  }
 }
 
 // TOAST
