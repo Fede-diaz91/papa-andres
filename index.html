@@ -2060,30 +2060,24 @@ function gGuardar(){var fecha=document.getElementById('g-fecha').value,notas=doc
   var percIIBB=parseFloat(document.getElementById('g-perc-iibb').value)||0;
   var percGan=parseFloat(document.getElementById('g-perc-gan').value)||0;
   var totalPagar=parseFloat(document.getElementById('g-total-pagar').value)||0;
-  // Distribuir percepciones e IVA proporcionalmente entre ítems (o solo al primero)
-  var promesas=items.map(function(it,idx){
-    // Proporcionar percepciones al primer ítem para simplificar (o proporcional)
+  // IVA y percepciones se reparten entre los ítems en proporción a su subtotal.
+  // La factura se graba completa en una sola operación (el control de comprobante duplicado se hace una vez).
+  var lineas=items.map(function(it,idx){
     var proporcion = subtotalTotal > 0 ? it.subtotal / subtotalTotal : (idx===0?1:0);
-    return apiPost('registrarCompra',{
-      fecha:fecha, proveedor:prov, insumo:it.insumo, unidad:it.unidad,
-      cantidad:it.cantidad, precioUnit:it.precioUnit, subtotal:it.subtotal,
-      iva:ivaPct, ivaMonto:Math.round(ivaMontoTotal*proporcion*100)/100,
+    return {
+      insumo:it.insumo, unidad:it.unidad, cantidad:it.cantidad, precioUnit:it.precioUnit, subtotal:it.subtotal,
+      ivaMonto:Math.round(ivaMontoTotal*proporcion*100)/100,
       montoTotal:Math.round(totalPagar*proporcion*100)/100,
       percepcionIVA:Math.round(percIVA*proporcion*100)/100,
       percepcionIIBB:Math.round(percIIBB*proporcion*100)/100,
-      percepcionGanancias:Math.round(percGan*proporcion*100)/100,
-      comprobante:comprobante, notas:notas
-    });
+      percepcionGanancias:Math.round(percGan*proporcion*100)/100
+    };
   });
-  Promise.all(promesas).then(function(results){
-    var allOk=results.every(function(r){return r.ok;});
-    if(allOk){toast(items.length===1?'Compra guardada ✓':''+items.length+' ítems guardados ✓');gLimpiarForm();}
-    else{
-      var duplic=results.find(function(r){return r&&r.duplicado;});
-      if(duplic) toast('⚠ Comprobante duplicado: ya existe una compra con ese número.',false);
-      else toast('Error al guardar algún ítem',false);
-    }
-  });
+  apiPost('registrarCompraFactura',{fecha:fecha, proveedor:prov, comprobante:comprobante, iva:ivaPct, notas:notas, items:lineas}).then(function(r){
+    if(r&&r.ok){toast(items.length===1?'Compra guardada ✓':''+items.length+' ítems guardados ✓');gLimpiarForm();}
+    else if(r&&r.duplicado) toast('⚠ Comprobante duplicado: ya existe una compra con ese número.',false);
+    else toast('Error al guardar la compra: '+((r&&(r.msg||r.error))||''),false);
+  }).catch(function(e){toast('Error: '+e.message,false);});
 }else if(gTipoActual==='gasto'){if(!gNatActual)return toast('Seleccioná si el gasto es Fijo o Variable',false);var concepto=document.getElementById('g-concepto').value.trim(),monto=document.getElementById('g-monto-gasto').value;if(!concepto||!monto)return toast('Completá concepto y monto',false);apiPost(gNatActual==='fijo'?'registrarGastoFijo':'registrarGastoVariable',{fecha:fecha,concepto:concepto,categoria:document.getElementById('g-cat-gasto').value,periodo:document.getElementById('g-periodo-gasto').value,monto:monto,proveedor:prov,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='envio'){var plat=document.getElementById('g-plataforma').value,mEnv=document.getElementById('g-monto-envio').value;if(!plat||!mEnv)return toast('Completá plataforma y monto',false);apiPost('registrarEnvio',{fecha:fecha,plataforma:plat,descripcion:document.getElementById('g-desc-envio').value,monto:mEnv,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='bien'){var cat=document.getElementById('g-cat-bien').value,desc=document.getElementById('g-desc-bien').value.trim(),mBien=document.getElementById('g-monto-bien').value;if(!cat||!desc||!mBien)return toast('Completá categoría, descripción y monto',false);apiPost('registrarBienDeUso',{fecha:fecha,categoria:cat,descripcion:desc,proveedor:prov,monto:mBien,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='alquiler'){var per=document.getElementById('g-periodo-alq').value.trim(),mAlq=document.getElementById('g-monto-alq').value;if(!per||!mAlq)return toast('Completá período y monto',false);apiPost('registrarAlquiler',{fecha:fecha,periodo:per,monto:mAlq,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}}
 function gLimpiarForm(){var hoy=new Date().toISOString().split('T')[0];document.getElementById('g-fecha').value=hoy;['g-comprobante','g-concepto','g-cat-gasto','g-periodo-gasto','g-monto-gasto','g-plataforma','g-desc-envio','g-monto-envio','g-cat-bien','g-desc-bien','g-monto-bien','g-periodo-alq','g-monto-alq','g-notas','g-subtotal','g-iva-monto','g-perc-iva','g-perc-iibb','g-perc-gan','g-total-pagar'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});var ivaEl=document.getElementById('g-iva');if(ivaEl)ivaEl.value='21';document.getElementById('g-vida-util-info').style.display='none';if(gTipoActual==='gasto'){document.querySelectorAll('.nat-sel-btn').forEach(function(b){b.classList.remove('active');});gNatActual=null;}// Limpiar ítems de compra
 var cont=document.getElementById('g-items-compra');if(cont)cont.innerHTML='';var tot=document.getElementById('ic-total-row');if(tot)tot.remove();_gCompraItems=0;// Agregar un ítem vacío nuevo si estamos en compra

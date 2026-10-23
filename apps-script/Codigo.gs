@@ -68,6 +68,7 @@ function doPost(e) {
     else if (action === 'borrarVentas')            result = borrarVentas(data);
     else if (action === 'registrarVentaManual')    result = registrarVentaManual(data);
     else if (action === 'registrarCompra')         result = registrarCompra(data);
+    else if (action === 'registrarCompraFactura')  result = registrarCompraFactura(data);
     else if (action === 'registrarGastoFijo')      result = registrarGastoFijo(data);
     else if (action === 'registrarGastoVariable')  result = registrarGastoVariable(data);
     else if (action === 'registrarEnvio')          result = registrarEnvio(data);
@@ -446,6 +447,30 @@ function registrarCompra(data) {
     parseFloat(data.percepcionIVA)||0, parseFloat(data.percepcionIIBB)||0,
     parseFloat(data.percepcionGanancias)||0, data.comprobante||'', data.notas||'']);
   return { ok:true };
+}
+
+// Factura completa en una sola operación: valida el comprobante una vez y graba todas las líneas juntas.
+// data: { fecha, proveedor, comprobante, iva (%), notas, items: [{ insumo, unidad, cantidad, precioUnit, subtotal,
+//         ivaMonto, montoTotal, percepcionIVA, percepcionIIBB, percepcionGanancias }] }
+function registrarCompraFactura(data) {
+  return _vConLock(function() {
+    var items = (data.items || []).filter(function(it){ return it && String(it.insumo || '').trim(); });
+    if (!items.length) return { ok: false, msg: 'La factura no tiene ítems' };
+    if (data.comprobante && String(data.comprobante).trim()) {
+      var check = verificarComprobante(data.comprobante, data.proveedor);
+      if (check.duplicado) return { ok: false, duplicado: true, msg: 'El comprobante "' + data.comprobante + '" ya está registrado para este proveedor.' };
+    }
+    var sheet = getSpreadsheet().getSheetByName('Compras');
+    var rows = items.map(function(it) {
+      return [data.fecha, data.proveedor || '', String(it.insumo).trim().toUpperCase(), it.unidad || '',
+        parseFloat(it.cantidad) || 0, parseFloat(it.precioUnit) || 0, parseFloat(it.subtotal) || 0,
+        parseFloat(data.iva) || 0, parseFloat(it.ivaMonto) || 0, parseFloat(it.montoTotal) || 0,
+        parseFloat(it.percepcionIVA) || 0, parseFloat(it.percepcionIIBB) || 0, parseFloat(it.percepcionGanancias) || 0,
+        data.comprobante || '', it.notas || data.notas || ''];
+    });
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    return { ok: true, count: rows.length };
+  });
 }
 
 function eliminarFila(sheetName, rowIndex, idVal) {
