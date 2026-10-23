@@ -264,7 +264,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
               <button class="btn btn-secondary btn-sm" onclick="exportarHTMLVentas()">🖨 Reporte HTML</button>
               <button class="btn btn-secondary btn-sm" onclick="exportarExcel()">⬇ Excel</button>
               <button class="btn btn-secondary btn-sm" onclick="abrirCargaManual()">+ Carga manual</button>
-              <button class="btn btn-danger btn-sm" onclick="borrarMes()">🗑 Borrar y reimportar</button>
+              <button class="btn btn-danger btn-sm" onclick="borrarMes()">🗑 Borrar importación</button>
             </div>
           </div>
           <div id="upload-section">
@@ -333,10 +333,11 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
               <div><label class="form-label">Canal / Plataforma</label><select id="vh-canal-borrar" class="form-input" style="min-width:180px"><option value="">Todos los canales</option></select></div>
               <div><label class="form-label">Tipo de dato</label><select id="vh-tipo-borrar" class="form-input"><option value="ambos">Ventas x día + Productos</option><option value="ventasDia">Solo ventas por día</option><option value="ventasProductos">Solo ventas por producto</option></select></div>
+              <div><label class="form-label">Origen</label><select id="vh-origen-borrar" class="form-input"><option value="">Todos</option><option value="RestoSimple">Solo importado (RestoSimple)</option><option value="Manual">Solo carga manual</option></select></div>
               <button class="btn btn-danger btn-sm" style="align-self:flex-end" onclick="vBorrarSelectivo()">Borrar filtrado</button>
               <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="document.getElementById('vh-borrado-panel').style.display='none'">Cancelar</button>
             </div>
-            <div style="font-size:11px;color:#8a7a5a;margin-top:8px">⚠ Borra las filas del mes filtrado que coincidan con el canal seleccionado.</div>
+            <div style="font-size:11px;color:#8a7a5a;margin-top:8px">⚠ Borra las filas del mes filtrado que coincidan con canal, tipo y origen. Las ventas por producto no tienen canal: si elegís un canal, solo se borran ventas por día.</div>
           </div>
           <div style="display:flex;gap:8px;margin-bottom:10px">
             <button class="btn btn-secondary btn-sm" onclick="vMostrarBorradoSelectivo()">🗑 Borrado selectivo</button>
@@ -1294,7 +1295,7 @@ function cargarModuloVentas() {
     .then(function(data) {
       if(data && data.tieneDatos) {
         mostrarBannerImportado(true, mes);
-        document.getElementById('upload-section').style.display = 'none';
+        document.getElementById('upload-section').style.display = '';
         renderReportes(data, mes, anio);
       } else {
         mostrarBannerImportado(false, mes);
@@ -1309,13 +1310,15 @@ function onCambiarMesVentas() { limpiarArchivo('dia'); limpiarArchivo('prod'); c
 function mostrarBannerImportado(show, mes) {
   var banner = document.getElementById('imported-banner');
   banner.style.display = show ? 'flex' : 'none';
-  if(show) document.getElementById('imported-banner-text').textContent = '✓ '+MESES[mes]+' ya tiene datos importados';
+  if(show) document.getElementById('imported-banner-text').textContent = '✓ '+MESES[mes]+' ya tiene ventas cargadas. Para actualizarlo subí los archivos nuevos de RestoSimple: se reemplaza lo importado antes y la carga manual se conserva.';
+  var btn = document.getElementById('btn-importar');
+  if(btn) btn.textContent = show ? '↻ Actualizar ventas del mes' : '↑ Importar ventas';
 }
 function borrarMes() {
   var mes = parseInt(document.getElementById('v-mes').value);
-  if(!confirm('¿Borrar todos los datos de ventas de '+MESES[mes]+'?')) return;
+  if(!confirm('¿Borrar lo importado de RestoSimple en '+MESES[mes]+'?\nLa carga manual (Rappi, mayoristas, etc.) se conserva.')) return;
   apiPost('borrarVentasMes', { mes: MESES[mes] })
-    .then(function(){ toast('Datos de '+MESES[mes]+' borrados ✓'); mostrarBannerImportado(false, mes); document.getElementById('upload-section').style.display = ''; document.getElementById('ventas-reportes').innerHTML = ''; });
+    .then(function(r){ if(!r||!r.ok){ toast('Error al borrar: '+((r&&(r.msg||r.error))||''),false); return; } toast('Importación de '+MESES[mes]+' borrada ✓'); mostrarBannerImportado(false, mes); document.getElementById('upload-section').style.display = ''; document.getElementById('ventas-reportes').innerHTML = ''; });
 }
 
 // ============================================================
@@ -1535,8 +1538,9 @@ function limpiarArchivo(tipo){
 }
 function procesarArchivo(file,tipo){var ext=file.name.split('.').pop().toLowerCase(),reader=new FileReader();if(ext==='csv'){reader.onload=function(e){guardarParseo(parsearCSV(e.target.result,tipo),tipo,file.name);};reader.readAsText(file,'UTF-8');}else if(ext==='xlsx'){reader.onload=function(e){var d=new Uint8Array(e.target.result),wb=XLSX.read(d,{type:'array',cellDates:false}),ws=wb.Sheets[wb.SheetNames[0]],rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});guardarParseo(tipo==='dia'?parsearFilasDia(rows):parsearFilasProd(rows),tipo,file.name);};reader.readAsArrayBuffer(file);}else toast('Formato no soportado',false);}
 function parsearCSV(txt,tipo){var rows=txt.split('\n').map(function(l){return l.trim();}).filter(Boolean).map(function(l){return l.split(',');});return tipo==='dia'?parsearFilasDia(rows):parsearFilasProd(rows);}
-function parsearFilasDia(rows){if(!rows||rows.length<2)return[];return rows.slice(1).filter(function(r){return r[0]&&String(r[0]).trim();}).map(function(r){return{fecha:String(r[0]).trim(),canal:String(r[1]).trim(),metodo:String(r[2]).trim(),pedidos:parseInt(String(r[3]).replace(/[^0-9]/g,''))||0,descuentos:parseFloat(String(r[4]).replace(',','.').replace(/[^0-9.]/g,''))||0,ticketMedio:parseFloat(String(r[5]).replace(',','.').replace(/[^0-9.]/g,''))||0,total:parseFloat(String(r[6]).replace(',','.').replace(/[^0-9.]/g,''))||0};});}
-function parsearFilasProd(rows){if(!rows||rows.length<2)return[];return rows.slice(1).filter(function(r){return r[0]&&String(r[0]).trim();}).map(function(r){return{producto:String(r[0]).trim(),cantidad:parseInt(String(r[1]).replace(/[^0-9]/g,''))||0,subtotal:parseFloat(String(r[2]).replace(',','.').replace(/[^0-9.]/g,''))||0};});}
+function vEsFilaBasura(v){var x=String(v||'').trim().toLowerCase();return !x||x==='fecha'||x==='producto'||x==='total'||x==='totales'||x.indexOf('reporte generado')===0;}
+function parsearFilasDia(rows){if(!rows||rows.length<2)return[];return rows.slice(1).filter(function(r){return r[0]&&!vEsFilaBasura(r[0]);}).map(function(r){return{fecha:String(r[0]).trim(),canal:String(r[1]).trim(),metodo:String(r[2]).trim(),pedidos:parseInt(String(r[3]).replace(/[^0-9]/g,''))||0,descuentos:parseFloat(String(r[4]).replace(',','.').replace(/[^0-9.]/g,''))||0,ticketMedio:parseFloat(String(r[5]).replace(',','.').replace(/[^0-9.]/g,''))||0,total:parseFloat(String(r[6]).replace(',','.').replace(/[^0-9.]/g,''))||0};});}
+function parsearFilasProd(rows){if(!rows||rows.length<2)return[];return rows.slice(1).filter(function(r){return r[0]&&!vEsFilaBasura(r[0]);}).map(function(r){return{producto:String(r[0]).trim(),cantidad:parseInt(String(r[1]).replace(/[^0-9]/g,''))||0,subtotal:parseFloat(String(r[2]).replace(',','.').replace(/[^0-9.]/g,''))||0};});}
 function guardarParseo(filas,tipo,nombre){if(!filas||!filas.length){toast('No se encontraron datos',false);return;}if(tipo==='dia'){_vDia=filas;document.getElementById('fname-dia').textContent=nombre;document.getElementById('clear-dia').style.display='inline-block';document.getElementById('icon-dia').textContent='✅';document.getElementById('box-dia').classList.add('ok');}else{_vProd=filas;document.getElementById('fname-prod').textContent=nombre;document.getElementById('clear-prod').style.display='inline-block';document.getElementById('icon-prod').textContent='✅';document.getElementById('box-prod').classList.add('ok');}actualizarEstadoVentas();}
 function actualizarEstadoVentas(){document.getElementById('btn-importar').disabled=!(_vDia&&_vProd);if(_vDia){var f={},p=0,t=0;_vDia.forEach(function(x){f[x.fecha]=1;p+=x.pedidos;t+=x.total;});document.getElementById('pre-dias').textContent=Object.keys(f).length;document.getElementById('pre-pedidos').textContent=p;document.getElementById('pre-total').textContent='$\u00A0'+Math.round(t).toLocaleString('es-AR');}if(_vProd)document.getElementById('pre-productos').textContent=_vProd.length;document.getElementById('resumen-pre').className='resumen-pre'+((_vDia||_vProd)?' show':'');}
 
@@ -1595,7 +1599,7 @@ function abrirCargaManual(){var hoy=new Date();var yy=hoy.getFullYear(),mm=Strin
   else { apiGet('productos').then(function(data){ _prodCache=data||[]; agregarItemRow(); }).catch(function(){ agregarItemRow(); }); }
 }
 function cerrarCargaManual(){document.getElementById('modal-manual').style.display='none';document.getElementById('modal-overlay').style.display='none';}
-function guardarVentaManual(){var mes=parseInt(document.getElementById('v-mes').value);var fechaInput=document.getElementById('m-fecha').value;var total=0;var items=[];for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var selProd=document.getElementById('i-prod-'+i);var txtProd=document.getElementById('i-prod-txt-'+i);var prod=selProd.value==='__otro__'?txtProd.value.trim():selProd.value;var cant=parseFloat(document.getElementById('i-cant-'+i).value)||1;var precio=parseFloat(document.getElementById('i-precio-'+i).value)||0;if(!prod||!precio)continue;items.push({producto:prod,cantidad:cant,precioUnit:precio,subtotal:cant*precio});total+=cant*precio;}if(!fechaInput||!items.length){toast('Completá fecha y al menos un producto con precio',false);return;}var partes=fechaInput.split('-');var fechaFmt=partes[2]+'/'+partes[1]+'/'+partes[0];var platSel=document.getElementById('m-plataforma');var platNombre=platSel.options[platSel.selectedIndex]?platSel.options[platSel.selectedIndex].text:'Manual';if(platSel.value==='nueva'){toast('Guardá primero la plataforma nueva',false);return;}var data={mes:MESES[mes].toLowerCase(),fecha:fechaFmt,plataforma:platNombre,metodo:document.getElementById('m-metodo').value,descuentos:parseFloat(document.getElementById('m-descuentos').value)||0,items:items};cerrarCargaManual();toast('Guardando...');apiPost('registrarVentaManual',data).then(function(r){if(r.ok){toast('Venta registrada ✓');cargarModuloVentas();}else toast('Error: '+(r.msg||''),false);});}
+function guardarVentaManual(){var mes=parseInt(document.getElementById('v-mes').value);var fechaInput=document.getElementById('m-fecha').value;var total=0;var items=[];for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var selProd=document.getElementById('i-prod-'+i);var txtProd=document.getElementById('i-prod-txt-'+i);var prod=selProd.value==='__otro__'?txtProd.value.trim():selProd.value;var cant=parseFloat(document.getElementById('i-cant-'+i).value)||1;var precio=parseFloat(document.getElementById('i-precio-'+i).value)||0;if(!prod||!precio)continue;items.push({producto:prod,cantidad:cant,precioUnit:precio,subtotal:cant*precio});total+=cant*precio;}if(!fechaInput||!items.length){toast('Completá fecha y al menos un producto con precio',false);return;}var partes=fechaInput.split('-');var fechaFmt=partes[2]+'/'+partes[1]+'/'+partes[0];var platSel=document.getElementById('m-plataforma');var platNombre=platSel.options[platSel.selectedIndex]?platSel.options[platSel.selectedIndex].text:'Manual';if(platSel.value==='nueva'){toast('Guardá primero la plataforma nueva',false);return;}var data={mes:MESES[parseInt(partes[1],10)]||MESES[mes],fecha:fechaFmt,plataforma:platNombre,metodo:document.getElementById('m-metodo').value,descuentos:parseFloat(document.getElementById('m-descuentos').value)||0,items:items};cerrarCargaManual();toast('Guardando...');apiPost('registrarVentaManual',data).then(function(r){if(r.ok){toast('Venta registrada ✓');cargarModuloVentas();}else toast('Error: '+(r.msg||''),false);});}
 
 // ============================================================
 // HISTORIAL VENTAS
@@ -1618,7 +1622,7 @@ var V_ALIAS_CAMPOS={
   TicketMedio:['TicketMedio','Ticket medio','Ticket Medio']
 };
 function vCampo(r,campo){var keys=V_ALIAS_CAMPOS[campo]||[campo];for(var i=0;i<keys.length;i++){var v=r[keys[i]];if(v!=null&&v!=='')return v;}return null;}
-function vRenderTabla(rows,tipo){var cont=document.getElementById('v-tabla-historial');if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cols=tipo==='ventasDia'?[['Mes','Mes'],['Fecha','Fecha'],['Canal','Canal'],['Método','Metodo'],['Pedidos','Pedidos'],['Descuentos','Descuentos'],['Ticket medio','TicketMedio'],['Total','Total']]:[['Mes','Mes'],['Producto','Producto'],['Cantidad','Cantidad'],['Subtotal','Subtotal']];var deleteAction=tipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c[0]+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=vCampo(r,c[1]);if(val==null)val='-';if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div>';html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
+function vRenderTabla(rows,tipo){var cont=document.getElementById('v-tabla-historial');if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cols=tipo==='ventasDia'?[['Mes','Mes'],['Fecha','Fecha'],['Canal','Canal'],['Método','Metodo'],['Pedidos','Pedidos'],['Descuentos','Descuentos'],['Ticket medio','TicketMedio'],['Total','Total'],['Origen','Origen']]:[['Mes','Mes'],['Producto','Producto'],['Cantidad','Cantidad'],['Subtotal','Subtotal'],['Origen','Origen']];var deleteAction=tipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c[0]+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=vCampo(r,c[1]);if(val==null)val='-';if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div>';html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
 function vEliminarRegistro(deleteAction,rowIndex,idx){if(!confirm('¿Eliminar este registro de ventas?'))return;apiPost(deleteAction,{rowIndex:rowIndex}).then(function(r){if(r.ok){toast('Eliminado ✓');vCargarHistorial();}else toast('Error: '+(r.msg||''),false);});}
 
 function vMostrarBorradoSelectivo(){
@@ -1629,7 +1633,7 @@ function vMostrarBorradoSelectivo(){
   if(_vHistorialCache && _vHistorialCache.length){
     var canales={};
     _vHistorialCache.forEach(function(r){
-      var c=r['Canal']||r['Metodo']||'';
+      var c=vCampo(r,'Canal')||'';
       if(c&&c!=='-')canales[c]=1;
     });
     Object.keys(canales).sort().forEach(function(c){sel.appendChild(new Option(c,c));});
@@ -1644,41 +1648,21 @@ function vBorrarSelectivo(){
   var mes=document.getElementById('vh-mes').value;
   var canal=document.getElementById('vh-canal-borrar').value;
   var tipoBorrar=document.getElementById('vh-tipo-borrar').value;
+  var origen=document.getElementById('vh-origen-borrar').value;
   if(!mes) return toast('Seleccioná un mes antes de borrar',false);
-  var confirmMsg='¿Borrar ventas de '+MESES[parseInt(mes)]+(canal?' del canal "'+canal+'"':' (todos los canales)')+'?';
-  if(!confirm(confirmMsg+'\nEsta acción no se puede deshacer.')) return;
-  
-  // Filtrar filas a borrar: solo las del cache actual que coincidan con canal
-  var filasABorrar=_vHistorialCache||[];
-  if(canal) filasABorrar=filasABorrar.filter(function(r){
-    return String(r['Canal']||'').toLowerCase()===canal.toLowerCase()||
-           String(r['Metodo']||'').toLowerCase()===canal.toLowerCase();
-  });
-  
-  if(!filasABorrar.length) return toast('No hay registros que coincidan',false);
-  
-  // Determinar qué borrar
-  var cargarDia  = tipoBorrar==='ventasDia'  || tipoBorrar==='ambos';
-  var cargarProd = tipoBorrar==='ventasProductos' || tipoBorrar==='ambos';
-  
-  if(canal){
-    // Borrado selectivo por canal: borrar fila a fila del tipo actual visible
-    var deleteAction=_vHistorialTipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';
-    var promesas=filasABorrar.map(function(r){return apiPost(deleteAction,{rowIndex:r._rowIndex});});
-    toast('Borrando '+promesas.length+' registros...');
-    Promise.all(promesas).then(function(){
-      toast(promesas.length+' registros eliminados ✓');
-      document.getElementById('vh-borrado-panel').style.display='none';
-      vCargarHistorial();
-    });
-  } else {
-    // Borrado completo del mes (ambos tipos)
-    toast('Borrando mes completo...');
-    apiPost('borrarVentasMes',{mes:MESES[parseInt(mes)].toLowerCase()}).then(function(r){
-      if(r.ok){toast('Mes borrado ✓');document.getElementById('vh-borrado-panel').style.display='none';vCargarHistorial();}
-      else toast('Error',false);
-    });
-  }
+  var nombreMes=MESES[parseInt(mes)];
+  var tipoTxt={ambos:'ventas por día y por producto',ventasDia:'ventas por día',ventasProductos:'ventas por producto'}[tipoBorrar];
+  var origenTxt={'':'todos los orígenes',RestoSimple:'solo lo importado de RestoSimple',Manual:'solo la carga manual'}[origen];
+  var msg='¿Borrar '+tipoTxt+' de '+nombreMes+(canal?' del canal "'+canal+'"':' (todos los canales)')+', '+origenTxt+'?';
+  if(canal&&tipoBorrar!=='ventasDia') msg+='\n\nOjo: las ventas por producto no tienen canal, así que solo se borran ventas por día.';
+  if(!confirm(msg+'\nEsta acción no se puede deshacer.')) return;
+  toast('Borrando...');
+  apiPost('borrarVentas',{mes:nombreMes,canal:canal,tipo:tipoBorrar,origen:origen}).then(function(r){
+    if(!r||!r.ok){toast('Error: '+((r&&(r.msg||r.error))||'no se pudo borrar'),false);return;}
+    toast((r.borradasDia+r.borradasProd)+' registros eliminados ✓');
+    document.getElementById('vh-borrado-panel').style.display='none';
+    vCargarHistorial();
+  }).catch(function(e){toast('Error: '+e.message,false);});
 }
 function vExportarExcel(){var rows=_vHistorialCache;if(!rows||!rows.length){toast('No hay datos para exportar',false);return;}var busq=(document.getElementById('vh-buscar').value||'').toLowerCase().trim();if(busq)rows=rows.filter(function(r){return Object.values(r).some(function(v){return String(v||'').toLowerCase().includes(busq);});});var tipo=_vHistorialTipo||'ventas',mes=document.getElementById('vh-mes').value,anio=document.getElementById('vh-anio').value;var wb=XLSX.utils.book_new();var exportRows=rows.map(function(r){var o={};Object.keys(r).filter(function(k){return k!=='_rowIndex';}).forEach(function(k){o[k]=r[k];});return o;});var ws=XLSX.utils.json_to_sheet(exportRows);XLSX.utils.book_append_sheet(wb,ws,'Historial');XLSX.writeFile(wb,'PapaAndres_'+tipo+'_'+(mes||'todo')+'_'+(anio||'')+'.xlsx');toast('Excel descargado ✓');}
 
