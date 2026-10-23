@@ -1427,11 +1427,11 @@ function generarExcelVentas(datos, mes, anio) {
     var bg = i % 2 === 0 ? 'ffffff' : 'fdf8f0';
     filaDia.push([
       xlCell(r.Fecha, {fillColor:bg}),
-      xlCell(r.Canal, {fillColor:bg}),
-      xlCell(r.Metodo||r.Método||'', {fillColor:bg}),
+      xlCell(vCampo(r,'Canal')||'', {fillColor:bg}),
+      xlCell(vCampo(r,'Metodo')||'', {fillColor:bg}),
       xlCell(r.Pedidos||0, {fillColor:bg}),
       xlCell(r.Descuentos||0, {fillColor:bg, peso:true}),
-      xlCell(r.TicketMedio||0, {fillColor:bg, peso:true}),
+      xlCell(vCampo(r,'TicketMedio')||0, {fillColor:bg, peso:true}),
       xlCell(r.Total||0, {fillColor:bg, peso:true}),
     ]);
   });
@@ -1610,7 +1610,15 @@ function vTab(id, btn) {
 function vInicializarHistorial(){var hoy=new Date(),mesActual=hoy.getMonth()+1,anioActual=hoy.getFullYear();['vh-mes','vh-anio'].forEach(function(id){var el=document.getElementById(id);if(!el)return;var isMes=id.includes('mes');el.innerHTML='<option value="">Todos</option>';if(isMes){MESES.slice(1).forEach(function(m,i){var opt=document.createElement('option');opt.value=i+1;opt.textContent=m;if(i+1===mesActual)opt.selected=true;el.appendChild(opt);});}else{for(var y=anioActual;y>=2026;y--){var opt=document.createElement('option');opt.value=y;opt.textContent=y;if(y===anioActual)opt.selected=true;el.appendChild(opt);}}});}
 function vCargarHistorial(){var tipo=document.getElementById('vh-tipo').value,mes=document.getElementById('vh-mes').value,anio=document.getElementById('vh-anio').value,cont=document.getElementById('v-tabla-historial'),action=tipo==='ventasDia'?'ventasHistorialDia':'ventasHistorialProductos';_vHistorialCache=null;_vHistorialTipo=tipo;cont.innerHTML='<div class="loading">Cargando...</div>';apiGet(action,{mes:mes,anio:anio}).then(function(rows){_vHistorialCache=rows||[];vFiltrarLocal();}).catch(function(){cont.innerHTML='<div class="loading">Error al cargar.</div>';});}
 function vFiltrarLocal(){if(!_vHistorialCache)return;var busq=(document.getElementById('vh-buscar').value||'').toLowerCase().trim();var filtradas=_vHistorialCache.filter(function(r){return !busq||Object.values(r).some(function(v){return String(v||'').toLowerCase().includes(busq);});});vRenderTabla(filtradas,_vHistorialTipo);}
-function vRenderTabla(rows,tipo){var cont=document.getElementById('v-tabla-historial');if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cols=tipo==='ventasDia'?['Mes','Fecha','Canal','Metodo','Pedidos','Descuentos','TicketMedio','Total']:['Mes','Producto','Cantidad','Subtotal'];var deleteAction=tipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=r[c]!=null?r[c]:'-';if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div>';html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
+// Alias de columnas: la hoja DatosDia usa encabezados con espacios y tildes
+// ("Canal de venta", "Método de pago", "Ticket medio"); se aceptan también los nombres cortos.
+var V_ALIAS_CAMPOS={
+  Canal:['Canal','Canal de venta','Plataforma'],
+  Metodo:['Metodo','Método','Método de pago','Metodo de pago'],
+  TicketMedio:['TicketMedio','Ticket medio','Ticket Medio']
+};
+function vCampo(r,campo){var keys=V_ALIAS_CAMPOS[campo]||[campo];for(var i=0;i<keys.length;i++){var v=r[keys[i]];if(v!=null&&v!=='')return v;}return null;}
+function vRenderTabla(rows,tipo){var cont=document.getElementById('v-tabla-historial');if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cols=tipo==='ventasDia'?[['Mes','Mes'],['Fecha','Fecha'],['Canal','Canal'],['Método','Metodo'],['Pedidos','Pedidos'],['Descuentos','Descuentos'],['Ticket medio','TicketMedio'],['Total','Total']]:[['Mes','Mes'],['Producto','Producto'],['Cantidad','Cantidad'],['Subtotal','Subtotal']];var deleteAction=tipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c[0]+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=vCampo(r,c[1]);if(val==null)val='-';if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div>';html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
 function vEliminarRegistro(deleteAction,rowIndex,idx){if(!confirm('¿Eliminar este registro de ventas?'))return;apiPost(deleteAction,{rowIndex:rowIndex}).then(function(r){if(r.ok){toast('Eliminado ✓');vCargarHistorial();}else toast('Error: '+(r.msg||''),false);});}
 
 function vMostrarBorradoSelectivo(){
