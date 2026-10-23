@@ -894,13 +894,18 @@ function getPreciosUltimaCompra(fechaCorte) {
     var colFecha  = headers.indexOf('Fecha');
     var colInsumo = headers.indexOf('Insumo');
     var colPrecio = headers.indexOf('PrecioUnit');
+    var colUnidad = headers.indexOf('Unidad');
     if (colFecha  < 0) colFecha  = 0;
     if (colInsumo < 0) colInsumo = 2;
     if (colPrecio < 0) colPrecio = 5;
+    if (colUnidad < 0) colUnidad = 3;
     data.slice(1).forEach(function(row) {
       var insumo = String(row[colInsumo] || '').trim().toUpperCase();
       var precio = parseFloat(row[colPrecio]) || 0;
       if (!insumo || precio <= 0) return;
+      // Compras sin unidad real (OTROS o vacía) son el total de una factura, no un precio unitario: no se usan para costear.
+      var unidad = String(row[colUnidad] || '').trim().toUpperCase();
+      if (!unidad || unidad === 'OTROS') return;
       var raw = row[colFecha];
       var d = (raw instanceof Date) ? raw : new Date(raw);
       if (isNaN(d.getTime())) return;
