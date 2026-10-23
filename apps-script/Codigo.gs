@@ -167,6 +167,7 @@ function getDashboardData(mes, anio) {
   var anioAnt = mes === 1 ? anio - 1 : anio;
   for (var m = 1; m <= 12; m++) ventasPorMes.push({ mes: m, valor: 0 });
   var NOMBRES_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  var parFiscal = getParametrosVenta().parametros;
   if (sheetDia && sheetDia.getLastRow() > 1) {
     var dataDia = sheetDia.getDataRange().getValues();
     dataDia.slice(1).forEach(function(row) {
@@ -177,14 +178,19 @@ function getDashboardData(mes, anio) {
       var anioFila = _vAnioFilaDia(row);
       var total = parseFloat(row[7])||0, desc = parseFloat(row[5])||0, peds = parseFloat(row[4])||0;
       if (anioFila === anio) {
-        ventasPorMes[idx].valor += total - desc;
+        ventasPorMes[idx].valor += (total - desc) / (1 + _tasasFiscales(parFiscal, anio, numMes).iva);
         if (numMes === mes) { ventasMesActual.total+=total; ventasMesActual.descuentos+=desc; ventasMesActual.pedidos+=peds; }
       }
       if (numMes === mesAnt && anioFila === anioAnt) { ventasMesAnt.total+=total; ventasMesAnt.descuentos+=desc; }
     });
   }
-  ventasMesActual.netas = ventasMesActual.total - ventasMesActual.descuentos;
-  ventasMesAnt.netas    = ventasMesAnt.total    - ventasMesAnt.descuentos;
+  // Desde el inicio de la facturación las ventas se toman netas de IVA y generan IIBB + Seg. e Higiene.
+  var tasasMes = _tasasFiscales(parFiscal, anio, mes), tasasAnt = _tasasFiscales(parFiscal, anioAnt, mesAnt);
+  var ventasConIva = ventasMesActual.total - ventasMesActual.descuentos;
+  ventasMesActual.netas = ventasConIva / (1 + tasasMes.iva);
+  ventasMesAnt.netas    = (ventasMesAnt.total - ventasMesAnt.descuentos) / (1 + tasasAnt.iva);
+  var ivaDebito = ventasConIva - ventasMesActual.netas;
+  var impuestosVenta = ventasMesActual.netas * (tasasMes.iibb + tasasMes.seh);
   var mesesConDatos = ventasPorMes.filter(function(v){return v.valor>0;}).map(function(v){return v.mes;});
   var compras  = _sumSheet('Compras',         mes, anio, 'Subtotal');
   var gastosF  = _sumSheet('GastosFijos',     mes, anio, 'Monto');
@@ -192,12 +198,13 @@ function getDashboardData(mes, anio) {
   var envios   = _sumSheet('Envíos',           mes, anio, 'Monto');
   var alquiler = _sumSheet('Alquiler',         mes, anio, 'Monto');
   var salarios = _sumSheet('Salarios',         mes, anio, 'SueldoNeto');
-  var totalGastos = compras + gastosF + gastosV + envios + alquiler + salarios;
+  var totalGastos = compras + gastosF + gastosV + envios + alquiler + salarios + impuestosVenta;
   var ventasNetas = ventasMesActual.netas;
   var resultadoNeto = ventasNetas - totalGastos;
   return {
     ventasBrutas:ventasMesActual.total, descuentos:ventasMesActual.descuentos,
     ventasNetas:ventasNetas, pedidos:ventasMesActual.pedidos,
+    ivaDebito:ivaDebito, impuestosVenta:impuestosVenta, facturacionActiva:tasasMes.activo,
     ticketMedio: ventasMesActual.pedidos > 0 ? ventasMesActual.total / ventasMesActual.pedidos : 0,
     compras:compras, gastosF:gastosF, gastosVar:gastosV+envios,
     gastosFijos:gastosF+alquiler+salarios, alquiler:alquiler, salarios:salarios,
@@ -220,7 +227,7 @@ function getEstadoResultados(anio) {
   for (var m = 1; m <= 12; m++) {
     meses.push({
       mes: m,
-      ventasBrutas:0, descuentos:0, ventasNetas:0,
+      ventasBrutas:0, descuentos:0, ivaDebito:0, ventasNetas:0, impuestosVenta:0,
       compras:0, gastosVar:0, envios:0,
       gastosFijos:0, alquiler:0, salarios:0,
       amortizacion:0, bienesDeUso:0, retiros:0,
@@ -295,9 +302,15 @@ function getEstadoResultados(anio) {
     });
   }
 
+  var parFiscal = getParametrosVenta().parametros;
   meses.forEach(function(m) {
-    m.ventasNetas   = m.ventasBrutas - m.descuentos;
-    m.totalVariable = m.compras + m.gastosVar + m.envios;
+    var tasas = _tasasFiscales(parFiscal, anio, m.mes);
+    var conIva = m.ventasBrutas - m.descuentos;
+    m.ventasNetas    = conIva / (1 + tasas.iva);
+    m.ivaDebito      = conIva - m.ventasNetas;
+    m.impuestosVenta = m.ventasNetas * (tasas.iibb + tasas.seh);
+    m.facturacionActiva = tasas.activo;
+    m.totalVariable = m.compras + m.gastosVar + m.envios + m.impuestosVenta;
     m.totalFijo     = m.gastosFijos + m.alquiler + m.salarios + m.amortizacion;
     m.totalEgresos  = m.totalVariable + m.totalFijo;
     m.resultado     = m.ventasNetas - m.totalEgresos;
@@ -305,7 +318,7 @@ function getEstadoResultados(anio) {
   });
 
   var totales = {
-    mes:0, ventasBrutas:0, descuentos:0, ventasNetas:0,
+    mes:0, ventasBrutas:0, descuentos:0, ivaDebito:0, ventasNetas:0, impuestosVenta:0,
     compras:0, gastosVar:0, envios:0, gastosFijos:0, alquiler:0,
     salarios:0, amortizacion:0, bienesDeUso:0, retiros:0,
     totalVariable:0, totalFijo:0, totalEgresos:0, resultado:0, margen:0
@@ -1371,8 +1384,17 @@ var PV_PARAMETROS_DEFECTO = [
   ['IVA', 21, 'IVA débito fiscal (%)'],
   ['IIBB', 3.5, 'Ingresos Brutos sobre el precio neto de IVA (%)'],
   ['SEG_HIGIENE', 1, 'Tasa de Seguridad e Higiene sobre el precio neto de IVA (%)'],
-  ['COSTO_OBJETIVO', 30, 'Costo de venta (producción + IIBB + SeH + comisión) como % del precio neto de IVA']
+  ['COSTO_OBJETIVO', 30, 'Costo de venta (producción + IIBB + SeH + comisión) como % del precio neto de IVA'],
+  ['INICIO_FACTURACION', 202611, 'Año y mes (AAAAMM) desde el que se factura: desde ese mes las ventas se toman netas de IVA y generan IIBB y SeH en los reportes']
 ];
+
+// Tasas que se aplican a las ventas de un mes: antes del inicio de la facturación, ninguna.
+function _tasasFiscales(par, anio, mes) {
+  var inicio = parseInt(par.INICIO_FACTURACION, 10) || 0;
+  if (!inicio || (anio * 100 + mes) < inicio) return { iva: 0, iibb: 0, seh: 0, activo: false };
+  return { iva: (parseFloat(par.IVA) || 0) / 100, iibb: (parseFloat(par.IIBB) || 0) / 100,
+           seh: (parseFloat(par.SEG_HIGIENE) || 0) / 100, activo: true };
+}
 var PV_CANALES_DEFECTO = [
   ['Mercado Pago', '', 'FINAL', 0, '', 'SI'],
   ['Rappi',        '', 'FINAL', 0, '', 'SI'],
