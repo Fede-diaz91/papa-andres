@@ -60,9 +60,10 @@ function doPost(e) {
     var data   = body.data || {};
     var result;
 
-    if      (action === 'importarVentasDia')       result = importarVentasDia(data.mes, data.filas);
-    else if (action === 'importarVentasProductos') result = importarVentasProductos(data.mes, data.filas);
-    else if (action === 'borrarVentasMes')         result = borrarVentasMes(data.mes, data.incluirManual);
+    if      (action === 'importarVentasDia')       result = importarVentasDia(data.mes, data.filas, data.anio);
+    else if (action === 'importarVentasProductos') result = importarVentasProductos(data.mes, data.filas, data.anio);
+    else if (action === 'borrarVentasMes')         result = borrarVentasMes(data.mes, data.incluirManual, data.anio);
+    else if (action === 'prepararVentas')          result = prepararVentas();
     else if (action === 'borrarVentas')            result = borrarVentas(data);
     else if (action === 'registrarVentaManual')    result = registrarVentaManual(data);
     else if (action === 'registrarCompra')         result = registrarCompra(data);
@@ -160,6 +161,7 @@ function getDashboardData(mes, anio) {
   var ventasMesActual = { total:0, descuentos:0, netas:0, pedidos:0 };
   var ventasMesAnt   = { total:0, descuentos:0, netas:0, pedidos:0 };
   var mesAnt  = mes === 1 ? 12 : mes - 1;
+  var anioAnt = mes === 1 ? anio - 1 : anio;
   for (var m = 1; m <= 12; m++) ventasPorMes.push({ mes: m, valor: 0 });
   var NOMBRES_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   if (sheetDia && sheetDia.getLastRow() > 1) {
@@ -169,10 +171,13 @@ function getDashboardData(mes, anio) {
       var idx = NOMBRES_MESES.indexOf(mesStr);
       if (idx < 0) return;
       var numMes = idx + 1;
+      var anioFila = _vAnioFilaDia(row);
       var total = parseFloat(row[7])||0, desc = parseFloat(row[5])||0, peds = parseFloat(row[4])||0;
-      ventasPorMes[idx].valor += total - desc;
-      if (numMes === mes) { ventasMesActual.total+=total; ventasMesActual.descuentos+=desc; ventasMesActual.pedidos+=peds; }
-      if (numMes === mesAnt) { ventasMesAnt.total+=total; ventasMesAnt.descuentos+=desc; }
+      if (anioFila === anio) {
+        ventasPorMes[idx].valor += total - desc;
+        if (numMes === mes) { ventasMesActual.total+=total; ventasMesActual.descuentos+=desc; ventasMesActual.pedidos+=peds; }
+      }
+      if (numMes === mesAnt && anioFila === anioAnt) { ventasMesAnt.total+=total; ventasMesAnt.descuentos+=desc; }
     });
   }
   ventasMesActual.netas = ventasMesActual.total - ventasMesActual.descuentos;
@@ -223,7 +228,7 @@ function getEstadoResultados(anio) {
   if (sheetDia && sheetDia.getLastRow() > 1) {
     sheetDia.getDataRange().getValues().slice(1).forEach(function(row) {
       var idx = NOMBRES.indexOf(String(row[0]).trim().toLowerCase());
-      if (idx < 0) return;
+      if (idx < 0 || _vAnioFilaDia(row) !== anio) return;
       meses[idx].ventasBrutas += parseFloat(row[7])||0;
       meses[idx].descuentos   += parseFloat(row[5])||0;
     });
@@ -539,13 +544,63 @@ var V_ORIGEN_RS     = 'RestoSimple';
 var V_ORIGEN_MANUAL = 'Manual';
 var V_COL_ORIGEN_DIA  = 9;
 var V_COL_ORIGEN_PROD = 5;
+// Columna Año: DatosDia col 10 (J), DatosProductos col 6 (F). Las filas viejas sin año son de 2026.
+var V_COL_ANIO_DIA  = 10;
+var V_COL_ANIO_PROD = 6;
+var V_ANIO_INICIAL  = 2026;
 var V_NOMBRES_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 function _vMesNorm(mes) {
   if (typeof mes === 'number') return V_NOMBRES_MESES[mes - 1] || '';
   var s = String(mes || '').trim().toLowerCase();
   if (/^[0-9]+$/.test(s)) return V_NOMBRES_MESES[parseInt(s, 10) - 1] || '';
-  return s;
+  return V_NOMBRES_MESES.indexOf(s) >= 0 ? s : '';
+}
+function _vAnioNum(anio) {
+  var a = parseInt(anio, 10);
+  return (a > 1900 && a < 3000) ? a : 0;
+}
+function _vAnioDeFecha(v) {
+  if (v instanceof Date && !isNaN(v.getTime())) return v.getFullYear();
+  var p = String(v || '').trim().split('/');
+  return p.length === 3 ? _vAnioNum(p[2]) : 0;
+}
+// Año de una fila de ventas: columna Año; si está vacía, el de la fecha (solo DatosDia); si no, 2026.
+function _vAnioFila(row, colAnio, colFecha) {
+  var a = _vAnioNum(row[colAnio - 1]);
+  if (a) return a;
+  if (colFecha) { a = _vAnioDeFecha(row[colFecha - 1]); if (a) return a; }
+  return V_ANIO_INICIAL;
+}
+function _vAnioFilaDia(row)  { return _vAnioFila(row, V_COL_ANIO_DIA, 2); }
+function _vAnioFilaProd(row) { return _vAnioFila(row, V_COL_ANIO_PROD, 0); }
+
+// Crea la columna Año si no existe y completa las filas existentes.
+function _vAsegurarAnio(sheet, colAnio, colFecha) {
+  var header = String(sheet.getRange(1, colAnio).getValue() || '').trim();
+  if (header === 'Año') return;
+  if (header) throw new Error('La hoja ' + sheet.getName() + ' ya tiene otra columna en la posición ' + colAnio + ': ' + header);
+  sheet.getRange(1, colAnio).setValue('Año');
+  sheet.getRange(1, 1).copyTo(sheet.getRange(1, colAnio), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  var n = sheet.getLastRow() - 1;
+  if (n < 1) return;
+  var data = sheet.getRange(2, 1, n, colAnio).getValues();
+  sheet.getRange(2, colAnio, n, 1).setValues(data.map(function(r) {
+    return [String(r[0] || '').trim() ? _vAnioFila(r, colAnio, colFecha) : ''];
+  }));
+}
+function _vAsegurarDia(sheet)  { _vAsegurarOrigen(sheet, V_COL_ORIGEN_DIA);  _vAsegurarAnio(sheet, V_COL_ANIO_DIA, 2); }
+function _vAsegurarProd(sheet) { _vAsegurarOrigen(sheet, V_COL_ORIGEN_PROD); _vAsegurarAnio(sheet, V_COL_ANIO_PROD, 0); }
+
+// Crea las columnas Origen y Año en las hojas de ventas (se puede llamar varias veces).
+function prepararVentas() {
+  return _vConLock(function() {
+    var ss = getSpreadsheet();
+    var sDia = ss.getSheetByName('DatosDia'), sProd = ss.getSheetByName('DatosProductos');
+    if (sDia)  _vAsegurarDia(sDia);
+    if (sProd) _vAsegurarProd(sProd);
+    return { ok:true };
+  });
 }
 function _vMesCap(mesNorm) {
   return mesNorm ? mesNorm.charAt(0).toUpperCase() + mesNorm.slice(1) : '';
@@ -606,60 +661,70 @@ function _vEsBasuraProd(f) {
 }
 
 function _vEsDelMes(row, mesN) { return String(row[0] || '').trim().toLowerCase() === mesN; }
+function _vEsDelPeriodoDia(row, mesN, anio)  { return _vEsDelMes(row, mesN) && (!anio || _vAnioFilaDia(row)  === anio); }
+function _vEsDelPeriodoProd(row, mesN, anio) { return _vEsDelMes(row, mesN) && (!anio || _vAnioFilaProd(row) === anio); }
 
 // Importa (o actualiza) un mes desde RestoSimple: reemplaza solo lo importado antes y conserva la carga manual.
-function importarVentasDia(mes, filas) {
+function importarVentasDia(mes, filas, anio) {
   return _vConLock(function() {
     var sheet = getSpreadsheet().getSheetByName('DatosDia');
     if (!sheet) return { ok:false, msg:'Hoja DatosDia no encontrada' };
-    _vAsegurarOrigen(sheet, V_COL_ORIGEN_DIA);
+    _vAsegurarDia(sheet);
     var mesN = _vMesNorm(mes), mesCap = _vMesCap(mesN);
     if (!mesN) return { ok:false, msg:'Mes inválido' };
     filas = filas || [];
+    var anioN = _vAnioNum(anio);
+    if (!anioN) { for (var i = 0; i < filas.length && !anioN; i++) anioN = _vAnioDeFecha(filas[i].fecha); }
+    if (!anioN) return { ok:false, msg:'Año inválido' };
     var reemplazadas = _vReescribir(sheet, function(r) {
-      return !(_vEsDelMes(r, mesN) && String(r[V_COL_ORIGEN_DIA - 1]).trim() !== V_ORIGEN_MANUAL);
+      return !(_vEsDelPeriodoDia(r, mesN, anioN) && String(r[V_COL_ORIGEN_DIA - 1]).trim() !== V_ORIGEN_MANUAL);
     });
     var validas = filas.filter(function(f){ return !_vEsBasuraDia(f); });
     var rows = validas.map(function(f) {
       return [mesCap, f.fecha||'', f.canal||'', f.metodo||'', parseFloat(f.pedidos)||0,
-              parseFloat(f.descuentos)||0, parseFloat(f.ticketMedio)||0, parseFloat(f.total)||0, V_ORIGEN_RS];
+              parseFloat(f.descuentos)||0, parseFloat(f.ticketMedio)||0, parseFloat(f.total)||0, V_ORIGEN_RS, anioN];
     });
-    if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, V_COL_ORIGEN_DIA).setValues(rows);
+    if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, V_COL_ANIO_DIA).setValues(rows);
     return { ok:true, count:rows.length, reemplazadas:reemplazadas, descartadas:filas.length - validas.length };
   });
 }
-function importarVentasProductos(mes, filas) {
+function importarVentasProductos(mes, filas, anio) {
   return _vConLock(function() {
     var sheet = getSpreadsheet().getSheetByName('DatosProductos');
     if (!sheet) return { ok:false, msg:'Hoja DatosProductos no encontrada' };
-    _vAsegurarOrigen(sheet, V_COL_ORIGEN_PROD);
+    _vAsegurarProd(sheet);
     var mesN = _vMesNorm(mes), mesCap = _vMesCap(mesN);
     if (!mesN) return { ok:false, msg:'Mes inválido' };
+    var anioN = _vAnioNum(anio);
+    if (!anioN) return { ok:false, msg:'Año inválido' };
     filas = filas || [];
     var reemplazadas = _vReescribir(sheet, function(r) {
-      return !(_vEsDelMes(r, mesN) && String(r[V_COL_ORIGEN_PROD - 1]).trim() !== V_ORIGEN_MANUAL);
+      return !(_vEsDelPeriodoProd(r, mesN, anioN) && String(r[V_COL_ORIGEN_PROD - 1]).trim() !== V_ORIGEN_MANUAL);
     });
     var validas = filas.filter(function(f){ return !_vEsBasuraProd(f); });
     var rows = validas.map(function(f) {
-      return [mesCap, f.producto||'', parseFloat(f.cantidad)||0, parseFloat(f.subtotal)||0, V_ORIGEN_RS];
+      return [mesCap, f.producto||'', parseFloat(f.cantidad)||0, parseFloat(f.subtotal)||0, V_ORIGEN_RS, anioN];
     });
-    if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, V_COL_ORIGEN_PROD).setValues(rows);
+    if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, V_COL_ANIO_PROD).setValues(rows);
     return { ok:true, count:rows.length, reemplazadas:reemplazadas, descartadas:filas.length - validas.length };
   });
 }
 
 // "Borrar y reimportar": por defecto borra solo lo importado de RestoSimple y conserva la carga manual.
-function borrarVentasMes(mes, incluirManual) {
-  return borrarVentas({ mes: mes, tipo: 'ambos', origen: incluirManual ? '' : V_ORIGEN_RS });
+function borrarVentasMes(mes, incluirManual, anio) {
+  return borrarVentas({ mes: mes, anio: anio, tipo: 'ambos', origen: incluirManual ? '' : V_ORIGEN_RS });
 }
 
 // Borrado selectivo atómico.
-// data: { mes, canal (opcional, solo aplica a ventas por día), tipo: 'ventasDia'|'ventasProductos'|'ambos', origen: ''|'RestoSimple'|'Manual' }
+// data: { mes, anio, canal (opcional, solo aplica a ventas por día), tipo: 'ventasDia'|'ventasProductos'|'ambos', origen: ''|'RestoSimple'|'Manual' }
+// Sin anio válido no borra nada (evita borrar el mismo mes de todos los años).
 function borrarVentas(data) {
   return _vConLock(function() {
     var ss = getSpreadsheet();
     var mesN = _vMesNorm(data.mes);
     if (!mesN) return { ok:false, msg:'Mes inválido' };
+    var anioN = _vAnioNum(data.anio);
+    if (!anioN) return { ok:false, msg:'Año inválido' };
     var canal  = String(data.canal || '').trim().toLowerCase();
     var origen = String(data.origen || '').trim();
     var tipo   = data.tipo || 'ambos';
@@ -668,9 +733,9 @@ function borrarVentas(data) {
     if (tipo === 'ventasDia' || tipo === 'ambos') {
       var sDia = ss.getSheetByName('DatosDia');
       if (sDia) {
-        _vAsegurarOrigen(sDia, V_COL_ORIGEN_DIA);
+        _vAsegurarDia(sDia);
         res.borradasDia = _vReescribir(sDia, function(r) {
-          var coincide = _vEsDelMes(r, mesN)
+          var coincide = _vEsDelPeriodoDia(r, mesN, anioN)
             && (!canal  || String(r[2] || '').trim().toLowerCase() === canal)
             && (!origen || String(r[V_COL_ORIGEN_DIA - 1] || '').trim() === origen);
           return !coincide;
@@ -684,9 +749,9 @@ function borrarVentas(data) {
       } else {
         var sProd = ss.getSheetByName('DatosProductos');
         if (sProd) {
-          _vAsegurarOrigen(sProd, V_COL_ORIGEN_PROD);
+          _vAsegurarProd(sProd);
           res.borradasProd = _vReescribir(sProd, function(r) {
-            var coincide = _vEsDelMes(r, mesN)
+            var coincide = _vEsDelPeriodoProd(r, mesN, anioN)
               && (!origen || String(r[V_COL_ORIGEN_PROD - 1] || '').trim() === origen);
             return !coincide;
           });
@@ -703,23 +768,24 @@ function registrarVentaManual(data) {
     var ss = getSpreadsheet();
     var sheetDia = ss.getSheetByName('DatosDia'), sheetProd = ss.getSheetByName('DatosProductos');
     if (!sheetDia || !sheetProd) return { ok:false, msg:'Hojas de ventas no encontradas' };
-    _vAsegurarOrigen(sheetDia, V_COL_ORIGEN_DIA);
-    _vAsegurarOrigen(sheetProd, V_COL_ORIGEN_PROD);
-    var mesN = _vMesDesdeFecha(data.fecha) || _vMesNorm(data.mes);
-    if (!mesN) return { ok:false, msg:'Fecha inválida' };
+    _vAsegurarDia(sheetDia);
+    _vAsegurarProd(sheetProd);
+    var mesN = _vMesDesdeFecha(data.fecha);
+    var anioN = _vAnioDeFecha(data.fecha);
+    if (!mesN || !anioN) return { ok:false, msg:'Fecha inválida' };
     var mesCap = _vMesCap(mesN);
     var items = data.items || [];
     var totalItems = items.reduce(function(s, it){ return s + (parseFloat(it.subtotal) || 0); }, 0);
     var desc = parseFloat(data.descuentos) || 0;
     var totalNeto = totalItems - desc;
-    sheetDia.getRange(sheetDia.getLastRow() + 1, 1, 1, V_COL_ORIGEN_DIA).setValues([[
-      mesCap, data.fecha, data.plataforma || 'Manual', data.metodo || 'Efectivo', 1, desc, totalNeto, totalNeto, V_ORIGEN_MANUAL
+    sheetDia.getRange(sheetDia.getLastRow() + 1, 1, 1, V_COL_ANIO_DIA).setValues([[
+      mesCap, data.fecha, data.plataforma || 'Manual', data.metodo || 'Efectivo', 1, desc, totalNeto, totalNeto, V_ORIGEN_MANUAL, anioN
     ]]);
     var rowsProd = items.filter(function(it){ return it.producto && String(it.producto).trim(); }).map(function(it) {
-      return [mesCap, String(it.producto).trim(), parseFloat(it.cantidad) || 1, parseFloat(it.subtotal) || 0, V_ORIGEN_MANUAL];
+      return [mesCap, String(it.producto).trim(), parseFloat(it.cantidad) || 1, parseFloat(it.subtotal) || 0, V_ORIGEN_MANUAL, anioN];
     });
-    if (rowsProd.length) sheetProd.getRange(sheetProd.getLastRow() + 1, 1, rowsProd.length, V_COL_ORIGEN_PROD).setValues(rowsProd);
-    return { ok:true, mes:mesCap };
+    if (rowsProd.length) sheetProd.getRange(sheetProd.getLastRow() + 1, 1, rowsProd.length, V_COL_ANIO_PROD).setValues(rowsProd);
+    return { ok:true, mes:mesCap, anio:anioN };
   });
 }
 function getVentasMesCompleto(mes, anio) {
@@ -729,8 +795,8 @@ function getVentasMesCompleto(mes, anio) {
   if(!sheetDia||sheetDia.getLastRow()<=1) return { tieneDatos:false };
   var dataDia=sheetDia.getDataRange().getValues();
   var DIAS=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-  var mesNombre=String(mes).trim().toLowerCase();
-  var filasDia=dataDia.slice(1).filter(function(row){return String(row[0]).trim().toLowerCase()===mesNombre;});
+  var mesNombre=String(mes).trim().toLowerCase(), anioN=_vAnioNum(anio);
+  var filasDia=dataDia.slice(1).filter(function(row){return _vEsDelPeriodoDia(row, mesNombre, anioN);});
   if(!filasDia.length) return { tieneDatos:false };
   var totalVentas=0,descuentos=0,pedidos=0,diasSet={},canalesMap={},metodosMap={},diasMap={};
   filasDia.forEach(function(row){
@@ -749,7 +815,7 @@ function getVentasMesCompleto(mes, anio) {
   var productos=[];
   if(sheetProd&&sheetProd.getLastRow()>1){
     var dataProd=sheetProd.getDataRange().getValues();
-    dataProd.slice(1).forEach(function(row){if(String(row[0]).trim().toLowerCase()===mesNombre)productos.push({producto:String(row[1]).trim(),cantidad:parseFloat(row[2])||0,subtotal:parseFloat(row[3])||0});});
+    dataProd.slice(1).forEach(function(row){if(_vEsDelPeriodoProd(row, mesNombre, anioN))productos.push({producto:String(row[1]).trim(),cantidad:parseFloat(row[2])||0,subtotal:parseFloat(row[3])||0});});
     productos.sort(function(a,b){return b.subtotal-a.subtotal;});
   }
   return { tieneDatos:true, totalVentas:totalVentas, descuentos:descuentos, pedidos:pedidos,
@@ -766,12 +832,14 @@ function getVentasHistorial(sheetName, mes, anio) {
   var headers = data[0];
   var tz = 'America/Argentina/Buenos_Aires';
   var NOMBRES_MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  var esDia = sheetName === 'DatosDia', anioN = _vAnioNum(anio);
   return data.slice(1).reduce(function(acc, row, idx) {
     if (!row[0]) return acc;
     if (mes) {
       var mesNombre = NOMBRES_MESES[parseInt(mes)-1] || '';
       if (String(row[0]).trim().toLowerCase() !== mesNombre) return acc;
     }
+    if (anioN && (esDia ? _vAnioFilaDia(row) : _vAnioFilaProd(row)) !== anioN) return acc;
     var obj = { _rowIndex: idx + 2 };
     headers.forEach(function(h, i) {
       obj[h] = (row[i] instanceof Date) ? Utilities.formatDate(row[i], tz, 'dd/MM/yyyy') : row[i];
@@ -782,11 +850,11 @@ function getVentasHistorial(sheetName, mes, anio) {
 }
 function getVentasParaExportar(mes, anio) {
   var ss=getSpreadsheet(), tz='America/Argentina/Buenos_Aires';
-  var mesNombre=String(mes).trim().toLowerCase(), resultado={dia:[],productos:[]};
+  var mesNombre=String(mes).trim().toLowerCase(), anioN=_vAnioNum(anio), resultado={dia:[],productos:[]};
   var sheetDia=ss.getSheetByName('DatosDia'), sheetProd=ss.getSheetByName('DatosProductos');
   if(sheetDia&&sheetDia.getLastRow()>1){
     sheetDia.getDataRange().getValues().slice(1).forEach(function(row){
-      if(String(row[0]).trim().toLowerCase()!==mesNombre) return;
+      if(!_vEsDelPeriodoDia(row, mesNombre, anioN)) return;
       var fechaStr=(row[1] instanceof Date)?Utilities.formatDate(row[1],tz,'dd/MM/yyyy'):String(row[1]).trim();
       resultado.dia.push({Fecha:fechaStr,Canal:String(row[2]).trim(),Metodo:String(row[3]).trim(),
         Pedidos:parseFloat(row[4])||0,Descuentos:parseFloat(row[5])||0,TicketMedio:parseFloat(row[6])||0,Total:parseFloat(row[7])||0});
@@ -794,7 +862,7 @@ function getVentasParaExportar(mes, anio) {
   }
   if(sheetProd&&sheetProd.getLastRow()>1){
     sheetProd.getDataRange().getValues().slice(1).forEach(function(row){
-      if(String(row[0]).trim().toLowerCase()!==mesNombre) return;
+      if(!_vEsDelPeriodoProd(row, mesNombre, anioN)) return;
       resultado.productos.push({Producto:String(row[1]).trim(),Cantidad:parseFloat(row[2])||0,Subtotal:parseFloat(row[3])||0});
     });
     resultado.productos.sort(function(a,b){return b.Subtotal-a.Subtotal;});
@@ -883,12 +951,14 @@ function getPreciosUltimaVenta() {
     if (!producto || cantidad <= 0 || subtotal <= 0) return;
     var mesIdx = NOMBRES.indexOf(mesStr);
     if (mesIdx < 0) return;
+    var anioFila = _vAnioFilaProd(row);
+    var orden = anioFila * 12 + mesIdx;
     var precio = subtotal / cantidad;
-    if (!mapa[producto] || mesIdx > mapa[producto].mesIdx) {
-      mapa[producto] = { precio: Math.round(precio), mesIdx: mesIdx, mes: NOMBRES[mesIdx] };
+    if (!mapa[producto] || orden > mapa[producto].orden) {
+      mapa[producto] = { precio: Math.round(precio), orden: orden, mes: NOMBRES[mesIdx], anio: anioFila };
     }
   });
-  Object.keys(mapa).forEach(function(k) { delete mapa[k].mesIdx; });
+  Object.keys(mapa).forEach(function(k) { delete mapa[k].orden; });
   return mapa;
 }
 

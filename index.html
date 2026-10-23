@@ -256,7 +256,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
               <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
             </select>
             <label style="margin-left:12px">Año</label>
-            <select id="v-anio" onchange="onCambiarMesVentas()"><option value="2026">2026</option><option value="2027">2027</option></select>
+            <select id="v-anio" onchange="onCambiarMesVentas()"></select>
           </div>
           <div class="imported-banner" id="imported-banner" style="display:none">
             <span class="imported-banner-text" id="imported-banner-text"></span>
@@ -1123,7 +1123,9 @@ document.addEventListener('DOMContentLoaded', function() {
   anioActivo = new Date().getFullYear();
   document.getElementById('topbar-mes').textContent = MESES[mesActivo]+' '+anioActivo;
   document.getElementById('v-mes').value  = mesActivo;
-  document.getElementById('v-anio').value = anioActivo;
+  var vAnioSel = document.getElementById('v-anio');
+  for (var y = 2026; y <= anioActivo + 1; y++) vAnioSel.appendChild(new Option(y, y));
+  vAnioSel.value = anioActivo;
   // Cargar insumos dinámicamente desde la API (fuente única de verdad)
   apiGet('insumos').then(function(data) {
     G_INSUMOS = (data || []).map(function(i){ return i.nombre; });
@@ -1316,8 +1318,9 @@ function mostrarBannerImportado(show, mes) {
 }
 function borrarMes() {
   var mes = parseInt(document.getElementById('v-mes').value);
-  if(!confirm('¿Borrar lo importado de RestoSimple en '+MESES[mes]+'?\nLa carga manual (Rappi, mayoristas, etc.) se conserva.')) return;
-  apiPost('borrarVentasMes', { mes: MESES[mes] })
+  if(!confirm('¿Borrar lo importado de RestoSimple en '+MESES[mes]+' '+document.getElementById('v-anio').value+'?\nLa carga manual (Rappi, mayoristas, etc.) se conserva.')) return;
+  var anio = parseInt(document.getElementById('v-anio').value);
+  apiPost('borrarVentasMes', { mes: MESES[mes], anio: anio })
     .then(function(r){ if(!r||!r.ok){ toast('Error al borrar: '+((r&&(r.msg||r.error))||''),false); return; } toast('Importación de '+MESES[mes]+' borrada ✓'); mostrarBannerImportado(false, mes); document.getElementById('upload-section').style.display = ''; document.getElementById('ventas-reportes').innerHTML = ''; });
 }
 
@@ -1549,8 +1552,8 @@ function importar(){
   var mes=parseInt(document.getElementById('v-mes').value),anio=parseInt(document.getElementById('v-anio').value),mn=MESES[mes];
   document.getElementById('btn-importar').disabled=true;
   setProgressV(10,'Enviando ventas por día...');
-  apiPost('importarVentasDia',{mes:mn,filas:_vDia})
-    .then(function(r1){if(!r1.ok){resetProgressV();toast('Error ventas',false);document.getElementById('btn-importar').disabled=false;return;}setProgressV(60,'Enviando productos...');return apiPost('importarVentasProductos',{mes:mn,filas:_vProd});})
+  apiPost('importarVentasDia',{mes:mn,anio:anio,filas:_vDia})
+    .then(function(r1){if(!r1.ok){resetProgressV();toast('Error ventas',false);document.getElementById('btn-importar').disabled=false;return;}setProgressV(60,'Enviando productos...');return apiPost('importarVentasProductos',{mes:mn,anio:anio,filas:_vProd});})
     .then(function(r2){if(!r2||!r2.ok){resetProgressV();toast('Error productos',false);document.getElementById('btn-importar').disabled=false;return;}setProgressV(100,'Completado ✓');var dDia=_vDia,dProd=_vProd;setTimeout(function(){resetProgressV();document.getElementById('btn-importar').disabled=false;document.getElementById('importar-status').textContent=r2.count+' productos';toast('Ventas de '+mn+' importadas ✓');limpiarArchivo('dia');limpiarArchivo('prod');mostrarBannerImportado(true,mes);document.getElementById('upload-section').style.display='none';renderReportesDesdeMemoria(dDia,dProd,mes,anio);},600);})
     .catch(function(err){resetProgressV();toast('Error: '+err.message,false);document.getElementById('btn-importar').disabled=false;});
 }
@@ -1649,15 +1652,16 @@ function vBorrarSelectivo(){
   var canal=document.getElementById('vh-canal-borrar').value;
   var tipoBorrar=document.getElementById('vh-tipo-borrar').value;
   var origen=document.getElementById('vh-origen-borrar').value;
+  var anio=parseInt(document.getElementById('vh-anio').value);
   if(!mes) return toast('Seleccioná un mes antes de borrar',false);
   var nombreMes=MESES[parseInt(mes)];
   var tipoTxt={ambos:'ventas por día y por producto',ventasDia:'ventas por día',ventasProductos:'ventas por producto'}[tipoBorrar];
   var origenTxt={'':'todos los orígenes',RestoSimple:'solo lo importado de RestoSimple',Manual:'solo la carga manual'}[origen];
-  var msg='¿Borrar '+tipoTxt+' de '+nombreMes+(canal?' del canal "'+canal+'"':' (todos los canales)')+', '+origenTxt+'?';
+  var msg='¿Borrar '+tipoTxt+' de '+nombreMes+' '+anio+(canal?' del canal "'+canal+'"':' (todos los canales)')+', '+origenTxt+'?';
   if(canal&&tipoBorrar!=='ventasDia') msg+='\n\nOjo: las ventas por producto no tienen canal, así que solo se borran ventas por día.';
   if(!confirm(msg+'\nEsta acción no se puede deshacer.')) return;
   toast('Borrando...');
-  apiPost('borrarVentas',{mes:nombreMes,canal:canal,tipo:tipoBorrar,origen:origen}).then(function(r){
+  apiPost('borrarVentas',{mes:nombreMes,anio:anio,canal:canal,tipo:tipoBorrar,origen:origen}).then(function(r){
     if(!r||!r.ok){toast('Error: '+((r&&(r.msg||r.error))||'no se pudo borrar'),false);return;}
     toast((r.borradasDia+r.borradasProd)+' registros eliminados ✓');
     document.getElementById('vh-borrado-panel').style.display='none';
