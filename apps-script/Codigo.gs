@@ -45,6 +45,7 @@ function doGet(e) {
     else if (action === 'preciosBase')      result = getPreciosBase();
     else if (action === 'insumos')          result = getInsumos();
     else if (action === 'subrecetas')       result = getSubrecetasCompleto();
+    else if (action === 'parametrosVenta')  result = getParametrosVenta();
     else result = { ok: true, msg: 'Papá Andrés API v2.3' };
 
     return _json(result);
@@ -102,6 +103,8 @@ function doPost(e) {
     else if (action === 'agregarInsumo')            result = agregarInsumo(data);
     else if (action === 'eliminarInsumo')           result = eliminarInsumo(data.nombre);
     else if (action === 'actualizarSubreceta')      result = actualizarSubreceta(data);
+    else if (action === 'agregarSubreceta')         result = agregarSubreceta(data);
+    else if (action === 'guardarParametrosVenta')   result = guardarParametrosVenta(data);
     else result = { ok: false, msg: 'Acción no reconocida: ' + action };
 
     return _json(result);
@@ -962,15 +965,12 @@ function getPreciosUltimaVenta() {
   return mapa;
 }
 
-function getProductos(fechaCorte) {
+// Modelo de costos compartido por Productos y Subrecetas: recetas, precios de insumos y rendimientos.
+function _modeloCostos(fechaCorte) {
   var ss = getSpreadsheet();
-  var sheetP = ss.getSheetByName('Productos');
   var sheetR = ss.getSheetByName('Recetas');
-  if (!sheetP || sheetP.getLastRow() <= 1) return [];
-
   // ── PUNTO 7: pasar fechaCorte a getPreciosUltimaCompra ──
   var preciosCompra = getPreciosUltimaCompra(fechaCorte || null);
-  var preciosVenta  = getPreciosUltimaVenta();
   var rendimientos  = getRendimientosSubrecetas();
 
   var recetasPorProducto = {};
@@ -1033,6 +1033,18 @@ function getProductos(fechaCorte) {
       };
     });
   }
+
+  return { calcularCosto: calcularCosto, enriquecerIngredientes: enriquecerIngredientes,
+           rendimientos: rendimientos, recetasPorProducto: recetasPorProducto };
+}
+
+function getProductos(fechaCorte) {
+  var ss = getSpreadsheet();
+  var sheetP = ss.getSheetByName('Productos');
+  if (!sheetP || sheetP.getLastRow() <= 1) return [];
+  var modelo = _modeloCostos(fechaCorte);
+  var calcularCosto = modelo.calcularCosto, enriquecerIngredientes = modelo.enriquecerIngredientes;
+  var preciosVenta  = getPreciosUltimaVenta();
 
   var dataP = sheetP.getDataRange().getValues();
   var headersP = dataP[0];
@@ -1291,18 +1303,41 @@ function getRendimientosSubrecetas() {
 // ============================================================
 // SUBRECETAS — listado completo con rendimiento
 // ============================================================
+// Subrecetas con su receta y costos: costo de la tanda (suma de ingredientes) y costo unitario (÷ rendimiento).
 function getSubrecetasCompleto() {
   var sheet = getSpreadsheet().getSheetByName('Subrecetas');
   if (!sheet || sheet.getLastRow() <= 1) return [];
   var data = sheet.getDataRange().getValues();
-  var tz = 'America/Argentina/Buenos_Aires';
-  return data.slice(1).filter(function(r){ return r[0]; }).map(function(r) {
+  var modelo = _modeloCostos(null);
+  return data.slice(1).filter(function(r){ return r[0]; }).map(function(r, idx) {
+    var nombre = String(r[0] || '').trim();
+    var nombreUp = nombre.toUpperCase();
+    var rendimiento = parseFloat(r[1]) || 1;
+    var costoTanda = modelo.calcularCosto(nombreUp, {});
     return {
-      nombre:      String(r[0] || '').trim(),
-      rendimiento: parseFloat(r[1]) || 1,
-      unidad:      String(r[2] || '').trim()
+      _rowIndex:     idx + 2,
+      nombre:        nombre,
+      rendimiento:   rendimiento,
+      unidad:        String(r[2] || '').trim(),
+      costoTanda:    Math.round(costoTanda * 10) / 10,
+      costoUnitario: Math.round((costoTanda / rendimiento) * 100) / 100,
+      ingredientes:  modelo.enriquecerIngredientes(nombreUp, {})
     };
   }).sort(function(a, b){ return a.nombre.localeCompare(b.nombre); });
+}
+
+// Alta de una subreceta nueva (sin ingredientes; se cargan después desde la app).
+function agregarSubreceta(data) {
+  var sheet = getSpreadsheet().getSheetByName('Subrecetas');
+  if (!sheet) return { ok: false, msg: 'Hoja Subrecetas no encontrada' };
+  var nombreUp = String(data.nombre || '').trim().toUpperCase();
+  if (!nombreUp) return { ok: false, msg: 'Nombre requerido' };
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0] || '').trim().toUpperCase() === nombreUp) return { ok: false, msg: 'Ya existe una subreceta con ese nombre' };
+  }
+  sheet.appendRow([nombreUp, parseFloat(data.rendimiento) || 1, data.unidad || 'UNIDAD']);
+  return { ok: true, nombre: nombreUp };
 }
 
 function actualizarSubreceta(data) {
@@ -1318,6 +1353,99 @@ function actualizarSubreceta(data) {
     }
   }
   return { ok: false, msg: 'Subreceta no encontrada: ' + data.nombre };
+}
+
+// ============================================================
+// FORMACIÓN DE PRECIOS — parámetros de impuestos y canales de venta
+// ============================================================
+// Hoja ParametrosVenta: Clave | Valor | Descripción   (porcentajes, ej. 3.5 = 3,5%)
+// Hoja CanalesVenta:    Canal | ComisionPct | BaseComision | DescuentoPct | Referencia | Activo
+//   BaseComision: FINAL (sobre el precio con IVA) o NETO (sobre el precio sin IVA). La comisión se toma neta de su propio IVA.
+//   Referencia:   si tiene un canal, el precio sale de ese canal menos DescuentoPct (ej. Efectivo = Mercado Pago − 10%).
+var PV_PARAMETROS_DEFECTO = [
+  ['IVA', 21, 'IVA débito fiscal (%)'],
+  ['IIBB', 3.5, 'Ingresos Brutos sobre el precio neto de IVA (%)'],
+  ['SEG_HIGIENE', 1, 'Tasa de Seguridad e Higiene sobre el precio neto de IVA (%)'],
+  ['COSTO_OBJETIVO', 30, 'Costo de venta (producción + IIBB + SeH + comisión) como % del precio neto de IVA']
+];
+var PV_CANALES_DEFECTO = [
+  ['Mercado Pago', '', 'FINAL', 0, '', 'SI'],
+  ['Rappi',        '', 'FINAL', 0, '', 'SI'],
+  ['PedidosYa',    '', 'FINAL', 0, '', 'SI'],
+  ['Efectivo',     0,  'FINAL', 10, 'Mercado Pago', 'SI']
+];
+
+function _pvHoja(nombre, headers, filasDefecto) {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(nombre);
+  if (!sheet) {
+    sheet = ss.insertSheet(nombre);
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#233f20').setFontColor('#fcebca');
+    sheet.setFrozenRows(1);
+    if (filasDefecto.length) sheet.getRange(2, 1, filasDefecto.length, headers.length).setValues(filasDefecto);
+  }
+  return sheet;
+}
+function _pvNum(v) {
+  if (v === '' || v === null || v === undefined) return null;
+  var n = parseFloat(String(v).replace(',', '.'));
+  return isNaN(n) ? null : n;
+}
+
+function getParametrosVenta() {
+  var sP = _pvHoja('ParametrosVenta', ['Clave', 'Valor', 'Descripcion'], PV_PARAMETROS_DEFECTO);
+  var sC = _pvHoja('CanalesVenta', ['Canal', 'ComisionPct', 'BaseComision', 'DescuentoPct', 'Referencia', 'Activo'], PV_CANALES_DEFECTO);
+  var parametros = {};
+  PV_PARAMETROS_DEFECTO.forEach(function(d) { parametros[d[0]] = d[1]; });
+  if (sP.getLastRow() > 1) {
+    sP.getRange(2, 1, sP.getLastRow() - 1, 2).getValues().forEach(function(r) {
+      var k = String(r[0] || '').trim().toUpperCase();
+      var v = _pvNum(r[1]);
+      if (k && v !== null) parametros[k] = v;
+    });
+  }
+  var canales = [];
+  if (sC.getLastRow() > 1) {
+    sC.getRange(2, 1, sC.getLastRow() - 1, 6).getValues().forEach(function(r) {
+      var nombre = String(r[0] || '').trim();
+      if (!nombre) return;
+      canales.push({
+        canal:        nombre,
+        comisionPct:  _pvNum(r[1]),                       // null = a confirmar
+        baseComision: String(r[2] || 'FINAL').trim().toUpperCase() === 'NETO' ? 'NETO' : 'FINAL',
+        descuentoPct: _pvNum(r[3]) || 0,
+        referencia:   String(r[4] || '').trim(),
+        activo:       String(r[5] || 'SI').trim().toUpperCase() !== 'NO'
+      });
+    });
+  }
+  return { parametros: parametros, canales: canales };
+}
+
+// data: { parametros: {IVA, IIBB, SEG_HIGIENE, COSTO_OBJETIVO}, canales: [{canal, comisionPct, baseComision, descuentoPct, referencia, activo}] }
+function guardarParametrosVenta(data) {
+  return _vConLock(function() {
+    var sP = _pvHoja('ParametrosVenta', ['Clave', 'Valor', 'Descripcion'], PV_PARAMETROS_DEFECTO);
+    var sC = _pvHoja('CanalesVenta', ['Canal', 'ComisionPct', 'BaseComision', 'DescuentoPct', 'Referencia', 'Activo'], PV_CANALES_DEFECTO);
+    var par = data.parametros || {};
+    var filasP = PV_PARAMETROS_DEFECTO.map(function(d) {
+      var v = _pvNum(par[d[0]]);
+      return [d[0], v === null ? d[1] : v, d[2]];
+    });
+    if (sP.getLastRow() > 1) sP.getRange(2, 1, sP.getLastRow() - 1, 3).clearContent();
+    sP.getRange(2, 1, filasP.length, 3).setValues(filasP);
+
+    var filasC = (data.canales || []).filter(function(c){ return c && String(c.canal || '').trim(); }).map(function(c) {
+      var com = _pvNum(c.comisionPct);
+      return [String(c.canal).trim(), com === null ? '' : com,
+              String(c.baseComision || 'FINAL').toUpperCase() === 'NETO' ? 'NETO' : 'FINAL',
+              _pvNum(c.descuentoPct) || 0, String(c.referencia || '').trim(), c.activo === false ? 'NO' : 'SI'];
+    });
+    if (sC.getLastRow() > 1) sC.getRange(2, 1, sC.getLastRow() - 1, 6).clearContent();
+    if (filasC.length) sC.getRange(2, 1, filasC.length, 6).setValues(filasC);
+    return { ok: true };
+  });
 }
 
 // ============================================================

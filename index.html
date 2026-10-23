@@ -236,7 +236,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
 </div>
 
 <main class="main">
-  <div id="panel-dashboard" class="panel active"><div class="loading">Cargando dashboard...</div></div>
+  <div id="panel-dashboard" class="panel active"><div class="loading">Cargando tablero...</div></div>
 
   <!-- VENTAS -->
   <div id="panel-ventas" class="panel">
@@ -420,7 +420,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
           <div id="g-campos-envio" style="display:none">
             <div class="card-title">Detalle del envío</div>
             <div class="form-grid-2">
-              <div><label class="form-label">Plataforma *</label><select id="g-plataforma" class="form-input"><option value="">Seleccioná...</option><option>PedidosYa</option><option>Rappi</option><option>Delivery propio</option><option>MercadoPago Delivery</option><option>Otro</option></select></div>
+              <div><label class="form-label">Plataforma *</label><select id="g-plataforma" class="form-input"><option value="">Seleccioná...</option><option>PedidosYa</option><option>Rappi</option><option>Envío propio</option><option>Mercado Pago Envíos</option><option>Otro</option></select></div>
               <div><label class="form-label">Monto $</label><input type="number" id="g-monto-envio" class="form-input" min="0" step="0.01" placeholder="0,00"></div>
               <div style="grid-column:1/-1"><label class="form-label">Descripción</label><input type="text" id="g-desc-envio" class="form-input" placeholder="Ej: Comisión semana 1"></div>
             </div>
@@ -652,6 +652,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
         <button class="gtab" onclick="prodTab('nuevo',this)">➕ Nuevo producto</button>
         <button class="gtab" onclick="prodTab('insumos',this)">🧂 Insumos</button>
         <button class="gtab" onclick="prodTab('precios',this)">💲 Precios de referencia</button>
+        <button class="gtab" onclick="prodTab('costos',this)">🧮 Costos y precios de venta</button>
         <button class="gtab" onclick="prodTab('subrecetas',this)">🔄 Subrecetas</button>
       </div>
       <!-- LISTADO -->
@@ -693,7 +694,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
               </select></div>
             <div><label class="form-label">En carta</label>
               <select id="np-carta" class="form-input"><option value="SI">Sí</option><option value="NO">No</option></select></div>
-            <div><label class="form-label">Food cost target %</label><input type="number" id="np-foodcost" class="form-input" value="30" min="1" max="100"></div>
+            <div><label class="form-label">Costo objetivo (% del precio)</label><input type="number" id="np-foodcost" class="form-input" value="30" min="1" max="100"></div>
           </div>
           <button class="btn btn-primary" onclick="prodGuardarNuevo()">Guardar producto</button>
         </div>
@@ -742,13 +743,54 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
         <div class="card">
           <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
             <span>Subrecetas</span>
-            <button class="btn btn-secondary btn-sm" onclick="subCargar()">↺ Actualizar</button>
+            <span style="display:flex;gap:6px">
+              <button class="btn btn-primary btn-sm" onclick="subMostrarAlta()">+ Nueva subreceta</button>
+              <button class="btn btn-secondary btn-sm" onclick="subCargar()">↺ Actualizar</button>
+            </span>
+          </div>
+          <div id="sub-alta" style="display:none;background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:14px;margin-bottom:14px">
+            <div style="font-size:11px;font-weight:600;color:var(--oliva);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Nueva subreceta</div>
+            <div class="form-grid-2" style="margin-bottom:10px">
+              <div><label class="form-label">Nombre *</label><input type="text" id="sa-nombre" class="form-input" placeholder="Ej: SALSA PESTO"></div>
+              <div><label class="form-label">Rendimiento de la tanda *</label><input type="number" id="sa-rinde" class="form-input" min="0" step="0.001" placeholder="Ej: 48"></div>
+              <div><label class="form-label">Unidad</label><select id="sa-unidad" class="form-input"><option value="UNIDAD">UNIDAD</option><option value="KG">KG</option><option value="LT">LT</option></select></div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="subGuardarAlta()">Crear y cargar receta</button>
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('sub-alta').style.display='none'">Cancelar</button>
           </div>
           <p style="font-size:12px;color:#8a7a5a;margin-bottom:14px;line-height:1.6">
             Las subrecetas son preparaciones intermedias (masas, salsas, rellenos) que se usan como ingredientes en otras recetas. 
-            El <strong>rendimiento</strong> indica cuántas unidades o kg produce un batch completo.
+            El <strong>rendimiento</strong> indica cuántas unidades o kg produce una tanda completa. Hacé clic en una subreceta para editar su rendimiento y sus ingredientes.
           </p>
           <div id="sub-lista"><div class="loading">Cargando subrecetas...</div></div>
+        </div>
+      </div>
+      <!-- COSTOS Y PRECIOS DE VENTA -->
+      <div id="prodtab-costos" style="display:none">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Parámetros de impuestos y canales</span>
+            <button class="btn btn-primary btn-sm" onclick="fpGuardarParametros()">Guardar parámetros</button>
+          </div>
+          <p style="font-size:12px;color:#8a7a5a;margin-bottom:12px;line-height:1.6">
+            <strong>Costo de producción</strong> = receta (insumos + subrecetas). <strong>Costo de venta</strong> = costo de producción + IIBB + Seguridad e Higiene + comisión del canal.
+            El <strong>precio sugerido</strong> es el que hace que el costo de venta sea el <strong>% objetivo del precio neto de IVA</strong>; al cliente se le cobra ese neto + IVA (redondeado a $100).
+            Las comisiones se toman <strong>netas de IVA</strong> (su IVA es crédito fiscal).
+          </p>
+          <div id="fp-parametros"><div class="loading">Cargando parámetros...</div></div>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-title">Precios sugeridos por canal</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
+            <div><label class="form-label">Rubro</label><select id="fp-rubro" class="form-input" onchange="fpRenderTabla()"><option value="">Todos los rubros</option></select></div>
+            <div><label class="form-label">En carta</label><select id="fp-carta" class="form-input" onchange="fpRenderTabla()"><option value="SI">Solo en carta</option><option value="">Todos</option></select></div>
+            <div style="flex:1;min-width:180px"><label class="form-label">Buscar</label><input type="text" id="fp-buscar" class="form-input" placeholder="Producto..." oninput="fpRenderTabla()"></div>
+          </div>
+          <div id="fp-tabla"><div class="loading">Cargando productos...</div></div>
+        </div>
+        <div class="card" id="fp-detalle-card" style="display:none">
+          <div class="card-title" id="fp-detalle-titulo">Detalle</div>
+          <div id="fp-detalle"></div>
         </div>
       </div>
       <!-- PRECIOS DE REFERENCIA -->
@@ -798,13 +840,23 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
       <div style="font-size:13px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.5px" id="modal-prod-titulo">Editar producto</div>
       <span style="cursor:pointer;color:#8a7a5a;font-size:18px" onclick="cerrarModalProd()">✕</span>
     </div>
+    <!-- Datos de la subreceta (solo en modo subreceta) -->
+    <div class="card" id="ep-bloque-sub" style="display:none;margin-bottom:14px;padding:14px 18px">
+      <div class="card-title">Datos de la subreceta</div>
+      <div class="form-grid-2" style="margin-bottom:10px">
+        <div><label class="form-label">Rendimiento de la tanda</label><input type="number" id="es-rinde" class="form-input" min="0" step="0.001"></div>
+        <div><label class="form-label">Unidad</label><select id="es-unidad" class="form-input"><option value="UNIDAD">UNIDAD</option><option value="KG">KG</option><option value="LT">LT</option></select></div>
+      </div>
+      <div id="es-resumen" style="font-size:12px;color:#8a7a5a;margin-bottom:10px"></div>
+      <button class="btn btn-primary btn-sm" onclick="subGuardarDatos()">Guardar rendimiento</button>
+    </div>
     <!-- Datos generales -->
-    <div class="card" style="margin-bottom:14px;padding:14px 18px">
+    <div class="card" id="ep-bloque-prod" style="margin-bottom:14px;padding:14px 18px">
       <div class="card-title">Datos generales</div>
       <div class="form-grid-2" style="margin-bottom:10px">
         <div><label class="form-label">Rubro</label><select id="ep-rubro" class="form-input"><option value="Pizzas">Pizzas</option><option value="Pizzas individuales">Pizzas individuales</option><option value="Pizzas super">Pizzas super</option><option value="Calzones">Calzones</option><option value="Empanadas">Empanadas</option><option value="Sanguches">Sanguches</option><option value="Otros">Otros</option></select></div>
         <div><label class="form-label">En carta</label><select id="ep-carta" class="form-input"><option value="SI">Sí</option><option value="NO">No</option></select></div>
-        <div><label class="form-label">Food cost target %</label><input type="number" id="ep-foodcost" class="form-input" min="1" max="100"></div>
+        <div><label class="form-label">Costo objetivo (% del precio)</label><input type="number" id="ep-foodcost" class="form-input" min="1" max="100"></div>
       </div>
       <button class="btn btn-primary btn-sm" onclick="prodGuardarEdicion()">Guardar cambios</button>
     </div>
@@ -816,7 +868,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
       <div style="background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:14px;margin-top:12px">
         <div style="font-size:11px;font-weight:600;color:var(--oliva);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">+ Agregar ingrediente</div>
         <div class="form-grid-2" style="margin-bottom:10px">
-          <div><label class="form-label">Insumo / Subreceta *</label><select id="ni-insumo" class="form-input"><option value="">— Seleccioná —</option></select></div>
+          <div><label class="form-label">Insumo / Subreceta *</label><select id="ni-insumo" class="form-input" onchange="prodOnElegirInsumo()"><option value="">— Seleccioná —</option></select></div>
           <div><label class="form-label">Tipo</label><select id="ni-tipo" class="form-input"><option value="NO">🧂 Ingrediente</option><option value="SI">🔄 Subreceta</option></select></div>
           <div><label class="form-label">Cantidad *</label><input type="number" id="ni-cantidad" class="form-input" min="0" step="0.001" placeholder="0.000"></div>
           <div><label class="form-label">Unidad</label><select id="ni-unidad" class="form-input"><option>KG</option><option>LT</option><option>UNIDAD</option><option>ATADO</option><option>OTROS</option></select></div>
@@ -874,7 +926,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
               <option value="margen">Margen $ (mayor a menor)</option>
               <option value="costoCalculado">Costo (menor a mayor)</option>
               <option value="precioVenta">Precio de venta</option>
-              <option value="unidadesVendidas">🏆 Ranking ventas del mes</option>
+              <option value="unidadesVendidas">🏆 Más vendidos del mes</option>
             </select></div>
           <div><label class="form-label">Mes de ventas</label>
             <select id="am-mes" class="form-input" onchange="amCargar()"></select></div>
@@ -929,14 +981,14 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div class="kpi"><div class="kpi-label">Margen $</div><div class="kpi-value" id="sim-margen-$" style="font-size:20px">$ 0</div></div>
       <div class="kpi"><div class="kpi-label">Margen %</div><div class="kpi-value" id="sim-margen-%" style="font-size:20px">0%</div></div>
-      <div class="kpi"><div class="kpi-label">Food cost %</div><div class="kpi-value" id="sim-fc" style="font-size:20px">0%</div></div>
+      <div class="kpi"><div class="kpi-label">Incidencia costo %</div><div class="kpi-value" id="sim-fc" style="font-size:20px">0%</div></div>
       <div class="kpi"><div class="kpi-label">Contribución marginal</div><div class="kpi-value" id="sim-cm" style="font-size:20px">$ 0</div></div>
     </div>
     <!-- Semáforo visual -->
     <div id="sim-semaforo" style="border-radius:10px;padding:12px 16px;font-size:13px;font-weight:600;text-align:center;margin-bottom:14px"></div>
     <!-- Precio sugerido -->
     <div style="background:#e8f0c8;border:1px solid #c8dfa0;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--oliva)">
-      💡 <strong>Precio sugerido</strong> para llegar al food cost objetivo (<span id="sim-target-pct">30</span>%): 
+      💡 <strong>Precio sugerido</strong> para llegar a la incidencia de costo objetivo (<span id="sim-target-pct">30</span>%): 
       <strong id="sim-precio-sugerido" style="font-size:14px">$ 0</strong>
       <button onclick="simAplicarSugerido()" style="margin-left:10px;background:var(--oliva);color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600">Aplicar</button>
     </div>
@@ -1189,7 +1241,7 @@ function cargarDashboard() {
     _dashData = results[0];
     _dashPrevData = results[1];
     renderDashboard(_dashData, _dashPrevData);
-  }).catch(function(){ document.getElementById('panel-dashboard').innerHTML='<div class="loading">Error cargando el dashboard.</div>'; });
+  }).catch(function(){ document.getElementById('panel-dashboard').innerHTML='<div class="loading">Error al cargar el tablero.</div>'; });
 }
 
 function renderDashboard(d, prev) {
@@ -1219,7 +1271,7 @@ function renderDashboard(d, prev) {
         '<div class="kpi-value" style="color:'+(d.resultadoNeto>=0?'var(--oliva)':'var(--rojo)')+'">'+fmt(d.resultadoNeto)+'</div>'+
         '<div class="kpi-delta '+(d.resultadoNeto>=0?'up':'down')+'">Margen '+(d.margen*100).toFixed(1)+'%</div></div>'+
       '<div class="kpi"><div class="kpi-label">Pedidos del mes</div><div class="kpi-value">'+(d.pedidos||'—')+'</div>'+
-        '<div class="kpi-delta" style="color:#8a7a5a">Ticket medio '+(d.ticketMedio?fmt(d.ticketMedio):'—')+'</div></div>'+
+        '<div class="kpi-delta" style="color:#8a7a5a">Promedio por pedido '+(d.ticketMedio?fmt(d.ticketMedio):'—')+'</div></div>'+
     '</div>'+
     '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px">'+
       '<div class="card"><div class="card-title">Ventas por mes — '+anioActivo+'</div>'+
@@ -1427,13 +1479,13 @@ function generarExcelVentas(datos, mes, anio) {
     [xlCell('🍕 PAPÁ ANDRÉS — VENTAS POR DÍA', {title:true,fontColor:XL_CREMA,center:true,sz:14}), '', '', '', '', '', ''],
     [xlCell(nombreMes, {bold:true,fontColor:XL_GRIS,center:true}), '', '', '', '', '', ''],
     [''],
-    [xlCell('Fecha',{header:true}), xlCell('Canal',{header:true}), xlCell('Método',{header:true}), xlCell('Pedidos',{header:true}), xlCell('Descuentos',{header:true}), xlCell('Ticket Medio',{header:true}), xlCell('Total',{header:true})],
+    [xlCell('Fecha',{header:true}), xlCell('Canal',{header:true}), xlCell('Método',{header:true}), xlCell('Pedidos',{header:true}), xlCell('Descuentos',{header:true}), xlCell('Promedio por pedido',{header:true}), xlCell('Total',{header:true})],
   ];
   datos.dia.forEach(function(r, i){
     var bg = i % 2 === 0 ? 'ffffff' : 'fdf8f0';
     filaDia.push([
       xlCell(r.Fecha, {fillColor:bg}),
-      xlCell(vCampo(r,'Canal')||'', {fillColor:bg}),
+      xlCell(vNombreCanal(vCampo(r,'Canal')||''), {fillColor:bg}),
       xlCell(vCampo(r,'Metodo')||'', {fillColor:bg}),
       xlCell(r.Pedidos||0, {fillColor:bg}),
       xlCell(r.Descuentos||0, {fillColor:bg, peso:true}),
@@ -1501,11 +1553,11 @@ function renderReportes(data, mes, anio) {
     '<div class="stat-card"><div class="stat-label">Descuentos</div><div class="stat-value" style="color:var(--rojo)">-'+fmt(desc)+'</div></div>'+
     '<div class="stat-card"><div class="stat-label">Ventas netas</div><div class="stat-value" style="color:var(--oliva)">'+fmt(neta)+'</div></div>'+
     '<div class="stat-card"><div class="stat-label">Pedidos</div><div class="stat-value">'+pedidos+'</div></div>'+
-    '<div class="stat-card"><div class="stat-label">Ticket medio</div><div class="stat-value">'+fmt(ticket)+'</div></div>'+
+    '<div class="stat-card"><div class="stat-label">Promedio por pedido</div><div class="stat-value">'+fmt(ticket)+'</div></div>'+
     '<div class="stat-card"><div class="stat-label">Días trabajados</div><div class="stat-value">'+(data.diasUnicos||0)+'</div></div>'+
   '</div>';
   var canales=data.porCanal||[], cHTML='<div class="canal-card"><div class="canal-card-title">Por canal de venta</div>';
-  canales.forEach(function(c,i){var col=COLORES[i%COLORES.length],pp=totalV>0?(c.total/totalV*100).toFixed(1):0;cHTML+='<div class="canal-item"><div class="canal-name"><span class="canal-dot" style="background:'+col+'"></span>'+c.canal+'</div><div class="canal-right"><div class="canal-monto">'+fmt(c.total)+'</div><div class="canal-pct">'+pp+'% · '+c.pedidos+' pedidos</div></div></div><div class="canal-bar-wrap"><div class="canal-bar-fill" style="width:'+pp+'%;background:'+col+';height:4px;border-radius:2px"></div></div>';});
+  canales.forEach(function(c,i){c=Object.assign({},c,{canal:vNombreCanal(c.canal)});var col=COLORES[i%COLORES.length],pp=totalV>0?(c.total/totalV*100).toFixed(1):0;cHTML+='<div class="canal-item"><div class="canal-name"><span class="canal-dot" style="background:'+col+'"></span>'+c.canal+'</div><div class="canal-right"><div class="canal-monto">'+fmt(c.total)+'</div><div class="canal-pct">'+pp+'% · '+c.pedidos+' pedidos</div></div></div><div class="canal-bar-wrap"><div class="canal-bar-fill" style="width:'+pp+'%;background:'+col+';height:4px;border-radius:2px"></div></div>';});
   cHTML+='</div>';
   var metodos=data.porMetodo||[], mHTML='<div class="canal-card"><div class="canal-card-title">Por método de pago</div>';
   metodos.forEach(function(m,i){var col=COLORES[i%COLORES.length],pp=totalV>0?(m.total/totalV*100).toFixed(1):0;mHTML+='<div class="canal-item"><div class="canal-name"><span class="canal-dot" style="background:'+col+'"></span>'+m.metodo+'</div><div class="canal-right"><div class="canal-monto">'+fmt(m.total)+'</div><div class="canal-pct">'+pp+'%</div></div></div><div class="canal-bar-wrap"><div class="canal-bar-fill" style="width:'+pp+'%;background:'+col+';height:4px;border-radius:2px"></div></div>';});
@@ -1515,7 +1567,7 @@ function renderReportes(data, mes, anio) {
   dias.forEach(function(d){var h=Math.max(Math.round((d.total/maxDia)*100),d.total>0?4:2),isMax=d.total===maxDia&&d.total>0;dHTML+='<div class="dia-col"><div class="dia-monto">'+fmtK(d.total)+'</div><div class="dia-bar'+(isMax?' es-max':'')+'" style="height:'+h+'px;opacity:'+(d.total>0?1:.2)+'"></div><div class="dia-label">'+d.dia+'</div></div>';});
   dHTML+='</div></div>';
   var prods=data.productos||[], totalP=prods.reduce(function(s,p){return s+(p.subtotal||0);},0);
-  var rHTML='<div class="card"><div class="card-title">Ranking de productos</div><table class="ranking-table"><thead><tr><th>#</th><th>Producto</th><th class="r">Unidades</th><th class="r">Ventas</th><th class="r">Part.</th><th></th></tr></thead><tbody>';
+  var rHTML='<div class="card"><div class="card-title">Productos más vendidos</div><table class="ranking-table"><thead><tr><th>#</th><th>Producto</th><th class="r">Unidades</th><th class="r">Ventas</th><th class="r">Part.</th><th></th></tr></thead><tbody>';
   prods.slice(0,30).forEach(function(p,i){var pp=totalP>0?(p.subtotal/totalP*100).toFixed(1):0;rHTML+='<tr><td><span class="rank-num">'+(i<3?['🥇','🥈','🥉'][i]:(i+1))+'</span></td><td><span class="rank-name">'+p.producto+'</span></td><td class="rank-qty">'+p.cantidad+'</td><td class="rank-monto">'+fmt(p.subtotal)+'</td><td class="rank-pct">'+pp+'%</td><td class="rank-bar-wrap"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:'+pp+'%"></div></div></td></tr>';});
   rHTML+='</tbody></table></div>';
   document.getElementById('ventas-reportes').innerHTML='<div class="reporte-sep">📊 Análisis — '+MESES[mes]+' '+anio+'<div class="reporte-sep-line"></div></div>'+kpis+'<div class="two-col">'+cHTML+mHTML+'</div>'+dHTML+rHTML;
@@ -1624,8 +1676,11 @@ var V_ALIAS_CAMPOS={
   Metodo:['Metodo','Método','Método de pago','Metodo de pago'],
   TicketMedio:['TicketMedio','Ticket medio','Ticket Medio']
 };
+// Nombres de canal que vienen en inglés desde RestoSimple: se muestran en español (el dato guardado no cambia).
+var V_NOMBRES_CANAL={'delivery':'Envío a domicilio','takeaway':'Retiro en local','take away':'Retiro en local'};
+function vNombreCanal(c){var k=String(c||'').trim().toLowerCase();return V_NOMBRES_CANAL[k]||c;}
 function vCampo(r,campo){var keys=V_ALIAS_CAMPOS[campo]||[campo];for(var i=0;i<keys.length;i++){var v=r[keys[i]];if(v!=null&&v!=='')return v;}return null;}
-function vRenderTabla(rows,tipo){var cont=document.getElementById('v-tabla-historial');if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cols=tipo==='ventasDia'?[['Mes','Mes'],['Fecha','Fecha'],['Canal','Canal'],['Método','Metodo'],['Pedidos','Pedidos'],['Descuentos','Descuentos'],['Ticket medio','TicketMedio'],['Total','Total'],['Origen','Origen']]:[['Mes','Mes'],['Producto','Producto'],['Cantidad','Cantidad'],['Subtotal','Subtotal'],['Origen','Origen']];var deleteAction=tipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c[0]+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=vCampo(r,c[1]);if(val==null)val='-';if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div>';html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
+function vRenderTabla(rows,tipo){var cont=document.getElementById('v-tabla-historial');if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cols=tipo==='ventasDia'?[['Mes','Mes'],['Fecha','Fecha'],['Canal','Canal'],['Método','Metodo'],['Pedidos','Pedidos'],['Descuentos','Descuentos'],['Promedio por pedido','TicketMedio'],['Total','Total'],['Origen','Origen']]:[['Mes','Mes'],['Producto','Producto'],['Cantidad','Cantidad'],['Subtotal','Subtotal'],['Origen','Origen']];var deleteAction=tipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c[0]+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=vCampo(r,c[1]);if(val==null)val='-';if(c[1]==='Canal')val=vNombreCanal(val);if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div>';html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
 function vEliminarRegistro(deleteAction,rowIndex,idx){if(!confirm('¿Eliminar este registro de ventas?'))return;apiPost(deleteAction,{rowIndex:rowIndex}).then(function(r){if(r.ok){toast('Eliminado ✓');vCargarHistorial();}else toast('Error: '+(r.msg||''),false);});}
 
 function vMostrarBorradoSelectivo(){
@@ -2217,6 +2272,7 @@ function erExportarExcel() {
 // ============================================================
 var _prodCache = null;
 var _prodEditando = null;
+var _modoEdicion = 'producto'; // 'producto' | 'subreceta'
 
 var RUBROS_PROD = ['Pizzas','Pizzas individuales','Pizzas super','Calzones','Empanadas','Sanguches','Otros'];
 
@@ -2226,12 +2282,13 @@ function prodInicializar() {
 }
 
 function prodTab(id, btn) {
-  ['listado','nuevo','insumos','precios','subrecetas'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
+  ['listado','nuevo','insumos','precios','subrecetas','costos'].forEach(function(t){ document.getElementById('prodtab-'+t).style.display = t===id?'':'none'; });
   document.querySelectorAll('#panel-productos .gtab').forEach(function(b){ b.classList.remove('active'); });
   btn.classList.add('active');
   if (id === 'precios') pbCargar();
   if (id === 'insumos') insCargar();
   if (id === 'subrecetas') subCargar();
+  if (id === 'costos') fpCargar();
 }
 
 function prodCargar() {
@@ -2281,7 +2338,7 @@ function prodRenderListado(lista) {
     html += '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
       '<th>Producto</th><th style="text-align:right">Costo</th><th style="text-align:right">Precio venta</th>'+
       '<th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th>'+
-      '<th style="text-align:right">Food cost %</th><th style="text-align:center">Semáforo</th>'+
+      '<th style="text-align:right">Incidencia costo %</th><th style="text-align:center">Semáforo</th>'+
       '<th style="text-align:center">Carta</th><th style="width:60px"></th></tr></thead><tbody>';
 
     grupos[rubro].forEach(function(p) {
@@ -2315,9 +2372,9 @@ function prodRenderListado(lista) {
   var warn = lista.filter(function(p){ return p.foodCostReal > p.foodCostTarget && p.foodCostReal <= p.foodCostTarget*1.2; }).length;
   var mal = lista.filter(function(p){ return p.foodCostReal > p.foodCostTarget*1.2; }).length;
   html = '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">'+
-    '<div style="background:#d1fae5;border-radius:8px;padding:8px 14px;font-size:12px;color:#065f46;font-weight:600">🟢 '+ok+' dentro del target</div>'+
-    '<div style="background:#fef3c7;border-radius:8px;padding:8px 14px;font-size:12px;color:#92400e;font-weight:600">🟡 '+warn+' hasta 20% sobre target</div>'+
-    '<div style="background:#fff0f0;border-radius:8px;padding:8px 14px;font-size:12px;color:#d61220;font-weight:600">🔴 '+mal+' sobre el target</div>'+
+    '<div style="background:#d1fae5;border-radius:8px;padding:8px 14px;font-size:12px;color:#065f46;font-weight:600">🟢 '+ok+' dentro del objetivo</div>'+
+    '<div style="background:#fef3c7;border-radius:8px;padding:8px 14px;font-size:12px;color:#92400e;font-weight:600">🟡 '+warn+' hasta 20% sobre el objetivo</div>'+
+    '<div style="background:#fff0f0;border-radius:8px;padding:8px 14px;font-size:12px;color:#d61220;font-weight:600">🔴 '+mal+' sobre el objetivo</div>'+
     '<div style="background:#f5f0e8;border-radius:8px;padding:8px 14px;font-size:12px;color:#8a7a5a">'+totalProd+' productos total</div>'+
   '</div>' + html;
 
@@ -2328,6 +2385,9 @@ function prodAbrirEditar(nombre) {
   var p = (_prodCache||[]).find(function(x){ return x.nombre === nombre; });
   if (!p) return;
   _prodEditando = p;
+  _modoEdicion = 'producto';
+  document.getElementById('ep-bloque-sub').style.display = 'none';
+  document.getElementById('ep-bloque-prod').style.display = '';
   document.getElementById('modal-prod-titulo').textContent = '✏ Editar: '+nombre;
   document.getElementById('ep-rubro').value = p.rubro || 'Otros';
   document.getElementById('ep-carta').value = p.enCarta ? 'SI' : 'NO';
@@ -2340,14 +2400,17 @@ function prodAbrirEditar(nombre) {
 function cerrarModalProd() {
   document.getElementById('modal-prod').style.display = 'none';
   document.getElementById('modal-prod-overlay').style.display = 'none';
+  var eraSub = _modoEdicion === 'subreceta';
   _prodEditando = null;
+  _modoEdicion = 'producto';
+  if (eraSub) subCargar();
 }
 
 function prodRenderReceta(p) {
   var fmt = function(n){ return '$\u00a0'+Math.round(n||0).toLocaleString('es-AR'); };
   var fmtDec = function(n){ return '$\u00a0'+(n||0).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:2}); };
   var ing = p.ingredientes || [];
-  if (!ing.length) { document.getElementById('ep-receta-lista').innerHTML='<div style="color:#8a7a5a;font-size:12px;padding:8px 0">Sin ingredientes cargados.</div>'; return; }
+  if (!ing.length) { document.getElementById('ep-receta-lista').innerHTML='<div style="color:#8a7a5a;font-size:12px;padding:8px 0">Sin ingredientes cargados.</div>'; prodPoblarInsumos(); return; }
   var html = '<div class="g-tabla-wrap"><table class="g-tabla" style="font-size:11px"><thead><tr>'+
     '<th>Tipo</th><th>Insumo / Subreceta</th><th style="text-align:right">Cantidad</th><th>Unidad</th>'+
     '<th style="text-align:right">Costo unit.</th><th style="text-align:right">Costo línea</th><th style="width:36px"></th></tr></thead><tbody>';
@@ -2363,7 +2426,7 @@ function prodRenderReceta(p) {
     var costoLineaStr = (i.costoLinea && i.costoLinea > 0) ? fmt(i.costoLinea) : '<span style="color:#ccc">—</span>';
 
     html += '<tr style="background:'+bg+'">'+
-      '<td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:'+(esSub?'#dbeafe':'#f0e4cc')+';color:'+(esSub?'#1e40af':'#8a7a5a')+'">'+(esSub?'🔄 Sub':'🧂 Ing')+'</span></td>'+
+      '<td><span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:'+(esSub?'#dbeafe':'#f0e4cc')+';color:'+(esSub?'#1e40af':'#8a7a5a')+'">'+(esSub?'🔄 Subreceta':'🧂 Insumo')+'</span></td>'+
       '<td style="font-weight:500;color:'+(sinPrecio?'var(--rojo)':'var(--verde)')+'">'+i.insumo+(sinPrecio?' <span style="font-size:9px;font-weight:400">(sin precio)</span>':'')+'</td>'+
       '<td class="num"><input type="number" value="'+i.cantidad+'" step="0.001" min="0" style="width:72px;padding:3px 5px;border:1.5px solid #e0d0b0;border-radius:5px;font-size:12px;text-align:right;font-family:Poppins,sans-serif" onchange="prodActualizarIngrediente('+i._rowIndex+',this.value,null)"></td>'+
       '<td><select style="padding:3px 5px;border:1.5px solid #e0d0b0;border-radius:5px;font-size:11px;font-family:Poppins,sans-serif" onchange="prodActualizarIngrediente('+i._rowIndex+',null,this.value)"><option'+(i.unidad==="KG"?" selected":"")+' value="KG">KG</option><option'+(i.unidad==="LT"?" selected":"")+' value="LT">LT</option><option'+(i.unidad==="UNIDAD"?" selected":"")+' value="UNIDAD">UND</option><option'+(i.unidad==="ATADO"?" selected":"")+' value="ATADO">ATADO</option><option'+(i.unidad==="OTROS"?" selected":"")+' value="OTROS">OTROS</option></select></td>'+
@@ -2372,8 +2435,15 @@ function prodRenderReceta(p) {
       '<td><button onclick="prodEliminarIngrediente('+i._rowIndex+',\''+i.insumo+'\')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td>'+
     '</tr>';
   });
-  html += '</tbody><tfoot><tr style="background:var(--verde);color:var(--crema)"><td colspan="5" style="padding:7px 10px;font-weight:700">Costo total del plato</td>'+
-    '<td class="num" style="font-weight:700;color:var(--crema)">'+fmt(p.costoCalculado)+'</td><td></td></tr></tfoot></table></div>';
+  if (_modoEdicion === 'subreceta') {
+    html += '</tbody><tfoot><tr style="background:var(--verde);color:var(--crema)"><td colspan="5" style="padding:7px 10px;font-weight:700">Costo total de la tanda</td>'+
+      '<td class="num" style="font-weight:700;color:var(--crema)">'+fmt(p.costoTanda)+'</td><td></td></tr>'+
+      '<tr style="background:#d4e8a0"><td colspan="5" style="padding:7px 10px;font-weight:700;color:var(--verde)">Costo por '+String(p.unidad||'unidad').toLowerCase()+' (÷ '+(p.rendimiento||1).toLocaleString('es-AR')+')</td>'+
+      '<td class="num" style="font-weight:700;color:var(--verde)">'+fmtDec(p.costoUnitario)+'</td><td></td></tr></tfoot></table></div>';
+  } else {
+    html += '</tbody><tfoot><tr style="background:var(--verde);color:var(--crema)"><td colspan="5" style="padding:7px 10px;font-weight:700">Costo total del plato</td>'+
+      '<td class="num" style="font-weight:700;color:var(--crema)">'+fmt(p.costoCalculado)+'</td><td></td></tr></tfoot></table></div>';
+  }
 
   // Alerta si hay ingredientes sin precio
   var sinPrecio = ing.filter(function(i){ return i.sinPrecio; });
@@ -2383,13 +2453,48 @@ function prodRenderReceta(p) {
   }
 
   document.getElementById('ep-receta-lista').innerHTML = html;
-  // Poblar desplegable de insumos
+  prodPoblarInsumos();
+}
+
+// Desplegable "Insumo / Subreceta": insumos + subrecetas de la hoja Subrecetas (sin la que se está editando).
+function prodPoblarInsumos() {
   var selIns = document.getElementById('ni-insumo');
-  if (selIns && selIns.options.length <= 1) {
+  if (!selIns) return;
+  var armar = function(subs) {
+    var propio = _prodEditando ? String(_prodEditando.nombre).toUpperCase() : '';
+    var nombresSub = (subs||[]).map(function(x){ return String(x.nombre).toUpperCase(); }).filter(function(n){ return n !== propio; });
     var optsIns = G_INSUMOS.map(function(ins){ return '<option value="'+ins+'">'+ins+'</option>'; }).join('');
-    var subrecetas = (_prodCache||[]).map(function(pr){ return pr.nombre; });
-    var optsSub = subrecetas.length ? '<optgroup label="— Subrecetas —">'+subrecetas.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join('')+'</optgroup>' : '';
+    var optsSub = nombresSub.length ? '<optgroup label="— Subrecetas —">'+nombresSub.map(function(n){ return '<option value="'+n+'" data-sub="1">'+n+'</option>'; }).join('')+'</optgroup>' : '';
     selIns.innerHTML = '<option value="">— Seleccioná —</option><optgroup label="— Insumos —">'+optsIns+'</optgroup>'+optsSub;
+  };
+  if (_subCache) armar(_subCache);
+  else apiGet('subrecetas').then(function(subs){ _subCache = subs || []; armar(_subCache); }).catch(function(){ armar([]); });
+}
+// Al elegir del desplegable, el tipo (insumo / subreceta) se completa solo.
+function prodOnElegirInsumo() {
+  var sel = document.getElementById('ni-insumo');
+  var opt = sel.options[sel.selectedIndex];
+  if (opt && opt.value) document.getElementById('ni-tipo').value = opt.getAttribute('data-sub') ? 'SI' : 'NO';
+}
+
+// Recarga lo que se está editando (producto o subreceta) y vuelve a dibujar la receta sin cerrar el modal.
+function prodRefrescarEditando() {
+  if (!_prodEditando) return;
+  var nombre = String(_prodEditando.nombre).toUpperCase();
+  if (_modoEdicion === 'subreceta') {
+    _subCache = null;
+    apiGet('subrecetas').then(function(subs) {
+      _subCache = subs || [];
+      var s = _subCache.find(function(x){ return String(x.nombre).toUpperCase() === nombre; });
+      if (s) { _prodEditando = s; prodRenderReceta(s); subRenderResumen(s); }
+    });
+  } else {
+    _prodCache = null;
+    apiGet('productos').then(function(data) {
+      _prodCache = data || [];
+      var p = _prodCache.find(function(x){ return x.nombre === _prodEditando.nombre; });
+      if (p) { _prodEditando = p; prodRenderReceta(p); }
+    });
   }
 }
 
@@ -2414,20 +2519,15 @@ function prodAgregarIngrediente() {
   var unidad = document.getElementById('ni-unidad').value;
   var esSub  = document.getElementById('ni-tipo').value;
   if (!insumo || !cant) return toast('Completá insumo y cantidad', false);
+  if (insumo === String(_prodEditando.nombre).toUpperCase()) return toast('Una subreceta no puede contenerse a sí misma', false);
   apiPost('agregarIngrediente', {
     producto: _prodEditando.nombre, insumo: insumo,
     cantidad: cant, unidad: unidad, esSubreceta: esSub === 'SI'
   }).then(function(r) {
     if (r.ok) {
       toast('Ingrediente agregado ✓');
-      document.getElementById('ni-insumo').innerHTML = '<option value="">— Seleccioná —</option>'; // forzar repoblado en próximo render
       document.getElementById('ni-cantidad').value='';
-      _prodCache=null;
-      apiGet('productos').then(function(data){
-        _prodCache=data||[];
-        var p = (_prodCache).find(function(x){ return x.nombre===_prodEditando.nombre; });
-        if(p){ _prodEditando=p; prodRenderReceta(p); }
-      });
+      prodRefrescarEditando();
     } else toast('Error', false);
   });
 }
@@ -2439,13 +2539,7 @@ function prodActualizarIngrediente(rowIndex, cantidad, unidad) {
   apiPost('actualizarIngrediente', payload).then(function(r) {
     if (r.ok) {
       toast('Actualizado ✓');
-      _prodCache = null;
-      // Refrescar receta sin cerrar el modal
-      apiGet('productos').then(function(data) {
-        _prodCache = data || [];
-        var p = _prodCache.find(function(x){ return x.nombre === _prodEditando.nombre; });
-        if (p) { _prodEditando = p; prodRenderReceta(p); }
-      });
+      prodRefrescarEditando();
     } else toast('Error al actualizar', false);
   });
 }
@@ -2455,12 +2549,7 @@ function prodEliminarIngrediente(rowIndex, insumo) {
   apiPost('eliminarIngrediente', { rowIndex: rowIndex }).then(function(r) {
     if (r.ok) {
       toast('Eliminado ✓');
-      _prodCache=null;
-      apiGet('productos').then(function(data){
-        _prodCache=data||[];
-        var p = (_prodCache).find(function(x){ return x.nombre===_prodEditando.nombre; });
-        if(p){ _prodEditando=p; prodRenderReceta(p); }
-      });
+      prodRefrescarEditando();
     } else toast('Error', false);
   });
 }
@@ -2814,7 +2903,7 @@ function amRender(lista, modoVentas) {
 
   var kpis = '<div class="kpi-grid" style="margin-bottom:20px">'+
     '<div class="kpi"><div class="kpi-label">Margen promedio</div><div class="kpi-value" style="color:var(--oliva)">'+avgMargen.toFixed(1)+'%</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Food cost promedio</div><div class="kpi-value">'+avgFC.toFixed(1)+'%</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Incidencia de costo promedio</div><div class="kpi-value">'+avgFC.toFixed(1)+'%</div></div>'+
     '<div class="kpi"><div class="kpi-label">Mayor margen</div><div class="kpi-value" style="color:var(--oliva);font-size:14px">'+mejorProd.nombre+'</div><div class="kpi-delta up">'+mejorProd.margenPct.toFixed(1)+'% — '+fmt(mejorProd.margen)+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Menor margen</div><div class="kpi-value" style="color:var(--rojo);font-size:14px">'+peorIdx.nombre+'</div><div class="kpi-delta down">'+peorIdx.margenPct.toFixed(1)+'% — '+fmt(peorIdx.margen)+'</div></div>'+
     (modoVentas ? '<div class="kpi"><div class="kpi-label">Total unidades vendidas</div><div class="kpi-value">'+totalUnidades.toLocaleString('es-AR')+'</div></div>' : '')+
@@ -2824,7 +2913,7 @@ function amRender(lista, modoVentas) {
   var maxMargen = Math.max.apply(null, lista.map(function(p){return p.margenPct;}));
   var maxUnidades = modoVentas ? Math.max.apply(null, lista.map(function(p){return p.unidadesVendidas||0;})) : 0;
 
-  var html = '<div class="card"><div class="card-title">'+(modoVentas?'🏆 Ranking por ventas del mes':'Ranking de contribución marginal')+'</div>'+
+  var html = '<div class="card"><div class="card-title">'+(modoVentas?'🏆 Más vendidos del mes':'Productos por contribución marginal')+'</div>'+
     '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
     '<th>#</th><th>Producto</th><th>Rubro</th>'+
     (modoVentas ? '<th style="text-align:right">Unidades</th><th style="min-width:100px">Volumen</th>' : '')+
@@ -2832,7 +2921,7 @@ function amRender(lista, modoVentas) {
     '<th style="text-align:right">Costo</th>'+
     '<th style="text-align:right">Margen $</th>'+
     '<th style="text-align:right">Margen %</th>'+
-    '<th style="text-align:right">Food cost</th>'+
+    '<th style="text-align:right">Incidencia costo</th>'+
     (!modoVentas ? '<th style="min-width:120px">Barra</th>' : '')+
     '<th style="width:40px"></th>'+
     '</tr></thead><tbody>';
@@ -2971,13 +3060,13 @@ function simActualizar() {
     sem.textContent = 'Ingresá un precio para ver el análisis';
   } else if (fc <= target) {
     sem.style.background = '#d1fae5'; sem.style.color = '#065f46';
-    sem.textContent = '🟢 Precio rentable — food cost dentro del objetivo (' + fc.toFixed(1) + '% ≤ ' + target + '%)';
+    sem.textContent = '🟢 Precio rentable — incidencia del costo dentro del objetivo (' + fc.toFixed(1) + '% ≤ ' + target + '%)';
   } else if (fc <= target * 1.2) {
     sem.style.background = '#fef3c7'; sem.style.color = '#92400e';
-    sem.textContent = '🟡 Precio límite — food cost levemente sobre el objetivo (' + fc.toFixed(1) + '% vs ' + target + '%)';
+    sem.textContent = '🟡 Precio límite — incidencia del costo levemente sobre el objetivo (' + fc.toFixed(1) + '% vs ' + target + '%)';
   } else {
     sem.style.background = '#fff0f0'; sem.style.color = '#d61220';
-    sem.textContent = '🔴 Precio bajo — food cost sobre el objetivo (' + fc.toFixed(1) + '% vs ' + target + '%)';
+    sem.textContent = '🔴 Precio bajo — incidencia del costo sobre el objetivo (' + fc.toFixed(1) + '% vs ' + target + '%)';
   }
 
   // Actualizar precio sugerido
@@ -3046,8 +3135,8 @@ function amExportarHTML() {
       '<div class="kpi"><div class="kpi-label">Menor margen</div><div class="kpi-value" style="color:#d61220;font-size:13px">'+lista[lista.length-1].nombre+'</div><div style="font-size:11px;color:#d61220">'+lista[lista.length-1].margenPct.toFixed(1)+'%</div></div>'+
       '<div class="kpi"><div class="kpi-label">Productos</div><div class="kpi-value">'+lista.length+'</div></div>'+
     '</div>'+
-    '<div class="card"><div class="card-title">Ranking de contribución marginal</div>'+
-      '<table><thead><tr><th>#</th><th>Producto</th><th>Rubro</th><th style="text-align:right">Precio venta</th><th style="text-align:right">Costo</th><th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th><th style="text-align:right">Food cost %</th><th style="min-width:190px">Barra</th></tr></thead>'+
+    '<div class="card"><div class="card-title">Productos por contribución marginal</div>'+
+      '<table><thead><tr><th>#</th><th>Producto</th><th>Rubro</th><th style="text-align:right">Precio venta</th><th style="text-align:right">Costo</th><th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th><th style="text-align:right">Incidencia costo %</th><th style="min-width:190px">Barra</th></tr></thead>'+
       '<tbody>'+filas+'</tbody></table></div>'+
     '<div class="nota">ℹ️ Costos calculados con precio de última compra de cada insumo. Precio de venta = promedio de ventas reales importadas.</div>'+
     '<div class="footer">Papá Andrés · Análisis Marginal · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
@@ -3168,7 +3257,7 @@ function peRender(d) {
     '<div class="kpi">'+
       '<div class="kpi-label">Ventas del mes</div>'+
       '<div class="kpi-value" style="color:'+(d.superado?'var(--oliva)':'var(--rojo)')+'">'+fmt(d.ventasNetas)+'</div>'+
-      '<div class="kpi-delta" style="color:#8a7a5a">'+d.pedidos+' pedidos · ticket '+fmt(d.ticketMedio)+'</div>'+
+      '<div class="kpi-delta" style="color:#8a7a5a">'+d.pedidos+' pedidos · promedio '+fmt(d.ticketMedio)+'</div>'+
     '</div>'+
     '<div class="kpi">'+
       '<div class="kpi-label">Margen de contribución</div>'+
@@ -3463,7 +3552,7 @@ function generarHTMLVentas(data, mes, anio) {
     return svg;
   }
 
-  var canales = data.porCanal||[];
+  var canales = (data.porCanal||[]).map(function(c){ return Object.assign({}, c, {canal: vNombreCanal(c.canal)}); });
   var metodos = data.porMetodo||[];
   var dias    = data.porDiaSemana||[];
   var prods   = data.productos||[];
@@ -3514,7 +3603,7 @@ function generarHTMLVentas(data, mes, anio) {
       '<div class="kpi"><div class="kpi-label">Descuentos</div><div class="kpi-value neg">-'+fmt(desc)+'</div></div>'+
       '<div class="kpi"><div class="kpi-label">Ventas netas</div><div class="kpi-value pos">'+fmt(neta)+'</div></div>'+
       '<div class="kpi"><div class="kpi-label">Total pedidos</div><div class="kpi-value">'+pedidos+'</div></div>'+
-      '<div class="kpi"><div class="kpi-label">Ticket medio</div><div class="kpi-value">'+fmt(ticket)+'</div></div>'+
+      '<div class="kpi"><div class="kpi-label">Promedio por pedido</div><div class="kpi-value">'+fmt(ticket)+'</div></div>'+
       '<div class="kpi"><div class="kpi-label">Días trabajados</div><div class="kpi-value">'+(data.diasUnicos||0)+'</div></div>'+
     '</div>'+
     '<div class="two-col">'+
@@ -3522,7 +3611,7 @@ function generarHTMLVentas(data, mes, anio) {
       '<div class="card"><div class="card-title">Por método de pago</div>'+svgBarras(metodos,totalV,'','metodo','total')+'</div>'+
     '</div>'+
     '<div class="card"><div class="card-title">Ventas por día de la semana</div>'+svgDias(dias)+'</div>'+
-    '<div class="card"><div class="card-title">Ranking de productos</div>'+
+    '<div class="card"><div class="card-title">Productos más vendidos</div>'+
       '<table><thead><tr><th>#</th><th>Producto</th><th class="r">Unidades</th><th class="r">Ventas</th><th class="r">Part.</th><th>Barra</th></tr></thead>'+
       '<tbody>'+rankRows+'</tbody></table>'+
     '</div>'+
@@ -3680,126 +3769,328 @@ function subCargar() {
   var cont = document.getElementById('sub-lista');
   cont.innerHTML = '<div class="loading">Cargando subrecetas...</div>';
   _subCache = null;
-  // Necesitamos subrecetas (rendimientos) + recetas (ingredientes de cada subreceta)
-  // Las subrecetas se obtienen de la acción 'subrecetas' del GAS
-  // Los ingredientes vienen embebidos en _prodCache via la acción 'productos'
-  Promise.all([
-    apiGet('subrecetas'),
-    _prodCache ? Promise.resolve(_prodCache) : apiGet('productos')
-  ]).then(function(results) {
-    var subs = results[0] || [];
-    var prods = results[1] || [];
-    if (!_prodCache) _prodCache = prods;
-    _subCache = subs;
-    subRender(subs, prods);
+  apiGet('subrecetas').then(function(subs) {
+    _subCache = subs || [];
+    subRender(_subCache);
   }).catch(function(e) {
     cont.innerHTML = '<div class="loading">Error: ' + e.message + '</div>';
   });
 }
 
-function subRender(subs, prods) {
+function subRender(subs) {
   var cont = document.getElementById('sub-lista');
   if (!subs.length) {
     cont.innerHTML = '<div class="loading" style="color:#8a7a5a">No hay subrecetas cargadas.</div>';
     return;
   }
-
-  // Construir mapa de recetas de cada subreceta desde _prodCache
-  // En el sistema, las subrecetas aparecen como productos con sus ingredientes
-  var recetaMapa = {};
-  prods.forEach(function(p) {
-    recetaMapa[p.nombre.toUpperCase()] = p.ingredientes || [];
-  });
-
-  var fmt = function(n) { return '$ ' + Math.round(n||0).toLocaleString('es-AR'); };
+  var fmt = function(n) { return '$ ' + Math.round(n||0).toLocaleString('es-AR'); };
   var fmtDec = function(n) { return (n||0).toLocaleString('es-AR', {minimumFractionDigits:0, maximumFractionDigits:3}); };
-
   var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>' +
-    '<th style="width:36px"></th>' +
     '<th>Subreceta</th>' +
     '<th style="text-align:right">Rendimiento</th>' +
-    '<th>Unidad batch</th>' +
-    '<th style="text-align:right">Costo batch</th>' +
+    '<th>Unidad</th>' +
+    '<th style="text-align:right">Costo de la tanda</th>' +
     '<th style="text-align:right">Costo unitario</th>' +
     '<th style="text-align:right">Ingredientes</th>' +
+    '<th style="width:70px"></th>' +
     '</tr></thead><tbody>';
-
   subs.forEach(function(s, idx) {
-    var nombre = String(s.nombre || '').toUpperCase();
-    var rinde = parseFloat(s.rendimiento) || 1;
-    var unidad = s.unidad || '';
-    var ings = recetaMapa[nombre] || [];
-    var costoBatch = ings.reduce(function(sum, i) { return sum + (i.costoLinea || 0); }, 0);
-    var costoUnit = rinde > 0 ? costoBatch / rinde : 0;
-    var rowId = 'sub-row-' + idx;
-    var detailId = 'sub-detail-' + idx;
-    var hasIngs = ings.length > 0;
-
-    var onclickAttr = hasIngs ? 'subToggleDetalle(\'' + detailId + '\')' : '';
-    html += '<tr id="' + rowId + '" style="cursor:' + (hasIngs?'pointer':'default') + '" onclick="' + onclickAttr + '">' +
-      '<td style="text-align:center;font-size:11px;color:#8a7a5a">' + (hasIngs ? '▶' : '') + '</td>' +
+    var ings = s.ingredientes || [];
+    var sinPrecio = ings.filter(function(i){ return i.sinPrecio; }).length;
+    html += '<tr style="cursor:pointer" onclick="subAbrirEditar(' + idx + ')">' +
       '<td style="font-weight:600;color:var(--verde)">' + s.nombre + '</td>' +
-      '<td class="num" style="font-weight:700">' + fmtDec(rinde) + '</td>' +
-      '<td style="color:#8a7a5a">' + unidad + '</td>' +
-      '<td class="num">' + (costoBatch > 0 ? fmt(costoBatch) : '<span style="color:#ccc">—</span>') + '</td>' +
-      '<td class="num" style="font-weight:600;color:var(--oliva)">' + (costoUnit > 0 ? fmt(costoUnit) : '<span style="color:#ccc">—</span>') + '</td>' +
-      '<td class="num" style="color:#8a7a5a">' + (hasIngs ? ings.length + ' ítem' + (ings.length!==1?'s':'') : '<span style="color:#ccc">sin receta</span>') + '</td>' +
+      '<td class="num" style="font-weight:700">' + fmtDec(s.rendimiento) + '</td>' +
+      '<td style="color:#8a7a5a">' + (s.unidad||'') + '</td>' +
+      '<td class="num">' + (s.costoTanda > 0 ? fmt(s.costoTanda) : '<span style="color:#ccc">—</span>') + '</td>' +
+      '<td class="num" style="font-weight:600;color:var(--oliva)">' + (s.costoUnitario > 0 ? '$ ' + s.costoUnitario.toLocaleString('es-AR', {maximumFractionDigits:2}) : '<span style="color:#ccc">—</span>') + '</td>' +
+      '<td class="num" style="color:#8a7a5a">' + (ings.length ? ings.length + ' ítem' + (ings.length!==1?'s':'') : '<span style="color:var(--rojo)">sin receta</span>') +
+        (sinPrecio ? ' <span style="color:var(--rojo);font-size:10px">· ' + sinPrecio + ' sin precio</span>' : '') + '</td>' +
+      '<td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();subAbrirEditar(' + idx + ')">✏ Editar</button></td>' +
     '</tr>';
-
-    if (hasIngs) {
-      html += '<tr id="' + detailId + '" style="display:none"><td colspan="7" style="padding:0">' +
-        '<div style="background:#f5f0e8;border-left:3px solid var(--verde);padding:12px 16px;margin:0">' +
-        '<div style="font-size:10px;font-weight:600;color:var(--verde);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">📋 Ingredientes del batch</div>' +
-        '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
-        '<thead><tr>' +
-        '<th style="text-align:left;padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Insumo</th>' +
-        '<th style="text-align:right;padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Cantidad</th>' +
-        '<th style="padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Unidad</th>' +
-        '<th style="text-align:right;padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Costo unit.</th>' +
-        '<th style="text-align:right;padding:4px 8px;color:#8a7a5a;font-weight:600;border-bottom:1px solid #e8d9b8">Subtotal</th>' +
-        '</tr></thead><tbody>';
-      ings.forEach(function(i) {
-        var sinPrecio = !i.costoUnit || i.costoUnit === 0;
-        html += '<tr>' +
-          '<td style="padding:5px 8px;font-weight:500;color:' + (sinPrecio?'var(--rojo)':'var(--verde)') + '">' +
-            (i.esSubreceta ? '🔄 ' : '🧂 ') + i.insumo +
-            (sinPrecio ? ' <span style="font-size:9px;color:var(--rojo)">(sin precio)</span>' : '') +
-          '</td>' +
-          '<td style="padding:5px 8px;text-align:right">' + fmtDec(i.cantidad) + '</td>' +
-          '<td style="padding:5px 8px;color:#8a7a5a">' + (i.unidad||'') + '</td>' +
-          '<td style="padding:5px 8px;text-align:right;color:#8a7a5a">' + (sinPrecio ? '—' : fmt(i.costoUnit)) + '</td>' +
-          '<td style="padding:5px 8px;text-align:right;font-weight:600">' + (i.costoLinea > 0 ? fmt(i.costoLinea) : '—') + '</td>' +
-        '</tr>';
-      });
-      html += '</tbody><tfoot><tr style="background:#e8f0c8">' +
-        '<td colspan="4" style="padding:6px 8px;font-weight:700;color:var(--verde)">Costo batch total</td>' +
-        '<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--verde)">' + fmt(costoBatch) + '</td>' +
-        '</tr>' +
-        '<tr style="background:#d4e8a0">' +
-        '<td colspan="4" style="padding:6px 8px;font-weight:700;color:var(--verde)">Costo por ' + unidad.toLowerCase() + ' (÷ ' + fmtDec(rinde) + ')</td>' +
-        '<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--verde)">' + fmt(costoUnit) + '</td>' +
-        '</tr></tfoot></table></div>' +
-      '</td></tr>';
-    }
   });
-
   html += '</tbody></table></div>';
-  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">' + subs.length + ' subrecetas · Hacé clic en cada fila para ver los ingredientes</div>';
+  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">' + subs.length + ' subrecetas · Hacé clic en una fila para abrirla y editarla</div>';
   cont.innerHTML = html;
 }
 
-function subToggleDetalle(id) {
-  var row = document.getElementById(id);
-  if (!row) return;
-  var visible = row.style.display !== 'none';
-  row.style.display = visible ? 'none' : '';
-  // Rotar el ▶ de la fila padre
-  var idx = id.replace('sub-detail-', '');
-  var parentRow = document.getElementById('sub-row-' + idx);
-  if (parentRow) {
-    var arrow = parentRow.querySelector('td:first-child');
-    if (arrow) arrow.textContent = visible ? '▶' : '▼';
-  }
+function subAbrirEditar(idx) {
+  var s = (_subCache || [])[idx];
+  if (!s) return;
+  _prodEditando = s;
+  _modoEdicion = 'subreceta';
+  document.getElementById('ep-bloque-prod').style.display = 'none';
+  document.getElementById('ep-bloque-sub').style.display = '';
+  document.getElementById('modal-prod-titulo').textContent = '✏ Subreceta: ' + s.nombre;
+  document.getElementById('es-rinde').value = s.rendimiento;
+  var selU = document.getElementById('es-unidad');
+  var u = String(s.unidad || 'UNIDAD').toUpperCase();
+  if (![].some.call(selU.options, function(o){ return o.value === u; })) selU.appendChild(new Option(u, u));
+  selU.value = u;
+  subRenderResumen(s);
+  prodRenderReceta(s);
+  document.getElementById('modal-prod-overlay').style.display = 'block';
+  document.getElementById('modal-prod').style.display = 'block';
+}
+
+function subRenderResumen(s) {
+  var el = document.getElementById('es-resumen');
+  if (!el) return;
+  el.innerHTML = 'Una tanda cuesta <strong>$ ' + Math.round(s.costoTanda||0).toLocaleString('es-AR') + '</strong> y rinde <strong>' +
+    (s.rendimiento||1).toLocaleString('es-AR') + ' ' + String(s.unidad||'').toLowerCase() + '</strong> → <strong>$ ' +
+    (s.costoUnitario||0).toLocaleString('es-AR', {maximumFractionDigits:2}) + '</strong> por ' + String(s.unidad||'unidad').toLowerCase() + '.';
+}
+
+function subGuardarDatos() {
+  if (!_prodEditando || _modoEdicion !== 'subreceta') return;
+  var rinde = parseFloat(document.getElementById('es-rinde').value);
+  if (!(rinde > 0)) return toast('El rendimiento tiene que ser mayor a 0', false);
+  apiPost('actualizarSubreceta', { nombre: _prodEditando.nombre, rendimiento: rinde, unidad: document.getElementById('es-unidad').value })
+    .then(function(r) {
+      if (r.ok) { toast('Subreceta actualizada ✓'); _prodCache = null; prodRefrescarEditando(); }
+      else toast('Error: ' + (r.msg || ''), false);
+    });
+}
+
+function subMostrarAlta() {
+  document.getElementById('sub-alta').style.display = 'block';
+  document.getElementById('sa-nombre').focus();
+}
+
+function subGuardarAlta() {
+  var nombre = document.getElementById('sa-nombre').value.trim().toUpperCase();
+  var rinde = parseFloat(document.getElementById('sa-rinde').value);
+  if (!nombre || !(rinde > 0)) return toast('Completá nombre y rendimiento', false);
+  apiPost('agregarSubreceta', { nombre: nombre, rendimiento: rinde, unidad: document.getElementById('sa-unidad').value })
+    .then(function(r) {
+      if (!r.ok) return toast('Error: ' + (r.msg || ''), false);
+      toast('Subreceta creada ✓');
+      document.getElementById('sub-alta').style.display = 'none';
+      document.getElementById('sa-nombre').value = ''; document.getElementById('sa-rinde').value = '';
+      _subCache = null;
+      apiGet('subrecetas').then(function(subs) {
+        _subCache = subs || [];
+        subRender(_subCache);
+        var idx = _subCache.findIndex(function(x){ return String(x.nombre).toUpperCase() === nombre; });
+        if (idx >= 0) subAbrirEditar(idx);
+      });
+    });
+}
+
+
+// ============================================================
+// COSTOS Y PRECIOS DE VENTA (formación de precios por canal)
+// ============================================================
+var _fpParams = null, _fpProductoSel = null;
+
+function fpCargar() {
+  Promise.all([apiGet('parametrosVenta'), _prodCache ? Promise.resolve(_prodCache) : apiGet('productos')])
+    .then(function(res) {
+      _fpParams = res[0] || { parametros: {}, canales: [] };
+      _prodCache = res[1] || [];
+      fpRenderParametros();
+      var selR = document.getElementById('fp-rubro');
+      if (selR.options.length <= 1) {
+        var rubros = {}; _prodCache.forEach(function(p){ if (p.rubro) rubros[p.rubro] = 1; });
+        Object.keys(rubros).sort().forEach(function(r){ selR.appendChild(new Option(r, r)); });
+      }
+      fpRenderTabla();
+      if (_fpProductoSel) fpVerDetalle(_fpProductoSel);
+    })
+    .catch(function(e) { document.getElementById('fp-parametros').innerHTML = '<div class="loading">Error al cargar: ' + e.message + '</div>'; });
+}
+
+function fpPct(v) { return (parseFloat(v) || 0) / 100; }
+
+// Calcula el desglose de un precio final (con IVA) para un canal.
+function fpDesglose(precioFinal, costoProd, canal, par) {
+  var iva = fpPct(par.IVA), iibb = fpPct(par.IIBB), seh = fpPct(par.SEG_HIGIENE);
+  var neto = precioFinal / (1 + iva);
+  var com = fpPct(canal.comisionPct);
+  var baseCom = canal.baseComision === 'NETO' ? neto : precioFinal;
+  var d = { precioFinal: precioFinal, iva: precioFinal - neto, neto: neto, costoProd: costoProd,
+            iibb: neto * iibb, seh: neto * seh, comision: baseCom * com };
+  d.gastosVenta = d.iibb + d.seh + d.comision;
+  d.costoVenta = costoProd + d.gastosVenta;
+  d.pctCosto = neto > 0 ? d.costoVenta / neto * 100 : 0;
+  d.margen = neto - d.costoVenta;
+  return d;
+}
+
+// Precio sugerido por canal: costo de venta = objetivo % del neto.  neto = costoProd / (obj − IIBB − SeH − comisión efectiva)
+function fpPreciosSugeridos(costoProd, par, canales) {
+  var iva = fpPct(par.IVA), iibb = fpPct(par.IIBB), seh = fpPct(par.SEG_HIGIENE), obj = fpPct(par.COSTO_OBJETIVO);
+  var res = {};
+  var activos = canales.filter(function(c){ return c.activo; });
+  activos.filter(function(c){ return !c.referencia; }).forEach(function(c) {
+    var comEf = fpPct(c.comisionPct) * (c.baseComision === 'NETO' ? 1 : (1 + iva));
+    var denom = obj - iibb - seh - comEf;
+    if (!(costoProd > 0)) { res[c.canal] = { sinCosto: true }; return; }
+    if (denom <= 0) { res[c.canal] = { inviable: true, comEf: comEf }; return; }
+    var final = Math.ceil(costoProd / denom * (1 + iva) / 100) * 100;
+    res[c.canal] = fpDesglose(final, costoProd, c, par);
+    res[c.canal].aConfirmar = c.comisionPct === null || c.comisionPct === undefined;
+  });
+  activos.filter(function(c){ return c.referencia; }).forEach(function(c) {
+    var ref = res[c.referencia];
+    if (!ref || ref.inviable || ref.sinCosto) { res[c.canal] = ref ? Object.assign({}, ref) : { sinReferencia: true }; return; }
+    var final = Math.round(ref.precioFinal * (1 - fpPct(c.descuentoPct)) / 100) * 100;
+    res[c.canal] = fpDesglose(final, costoProd, c, par);
+    res[c.canal].aConfirmar = ref.aConfirmar;
+  });
+  return res;
+}
+
+function fpRenderParametros() {
+  var par = _fpParams.parametros, canales = _fpParams.canales;
+  var inp = function(id, val, step) { return '<input type="number" id="' + id + '" class="form-input" step="' + (step||'0.01') + '" value="' + (val === null || val === undefined ? '' : val) + '" style="max-width:110px">'; };
+  var html = '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">' +
+    '<div><label class="form-label">IVA %</label>' + inp('fp-iva', par.IVA) + '</div>' +
+    '<div><label class="form-label">IIBB %</label>' + inp('fp-iibb', par.IIBB) + '</div>' +
+    '<div><label class="form-label">Seg. e Higiene %</label>' + inp('fp-seh', par.SEG_HIGIENE) + '</div>' +
+    '<div><label class="form-label">Costo de venta objetivo %</label>' + inp('fp-obj', par.COSTO_OBJETIVO) + '</div>' +
+    '</div>';
+  var nombres = canales.map(function(c){ return c.canal; });
+  html += '<div class="g-tabla-wrap"><table class="g-tabla" id="fp-canales"><thead><tr><th>Canal</th><th>Comisión % (neta de IVA)</th><th>Se cobra sobre</th><th>Descuento %</th><th>Precio basado en</th><th>Activo</th><th style="width:36px"></th></tr></thead><tbody>';
+  canales.forEach(function(c, i) { html += fpFilaCanal(c, i, nombres); });
+  html += '</tbody></table></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;flex-wrap:wrap;gap:8px">' +
+    '<button class="btn btn-secondary btn-sm" onclick="fpAgregarCanal()">+ Agregar canal</button>' +
+    '<span style="font-size:11px;color:#8a7a5a">Comisión vacía = <strong>a confirmar</strong> (se calcula como 0%). "Precio basado en": el canal toma el precio de otro canal menos el descuento (ej. Efectivo = Mercado Pago − 10%).</span></div>';
+  document.getElementById('fp-parametros').innerHTML = html;
+}
+
+function fpFilaCanal(c, i, nombres) {
+  var optsRef = '<option value="">— Precio propio —</option>' + nombres.filter(function(n){ return n !== c.canal; }).map(function(n){
+    return '<option value="' + n + '"' + (c.referencia === n ? ' selected' : '') + '>' + n + '</option>'; }).join('');
+  var com = c.comisionPct === null || c.comisionPct === undefined ? '' : c.comisionPct;
+  return '<tr data-i="' + i + '">' +
+    '<td><input type="text" class="form-input fp-c-nombre" value="' + (c.canal||'') + '" style="min-width:130px"></td>' +
+    '<td><input type="number" step="0.01" class="form-input fp-c-com" value="' + com + '" placeholder="a confirmar" style="max-width:120px"></td>' +
+    '<td><select class="form-input fp-c-base"><option value="FINAL"' + (c.baseComision !== 'NETO' ? ' selected' : '') + '>Precio final (con IVA)</option><option value="NETO"' + (c.baseComision === 'NETO' ? ' selected' : '') + '>Precio neto (sin IVA)</option></select></td>' +
+    '<td><input type="number" step="0.01" class="form-input fp-c-desc" value="' + (c.descuentoPct||0) + '" style="max-width:90px"></td>' +
+    '<td><select class="form-input fp-c-ref">' + optsRef + '</select></td>' +
+    '<td style="text-align:center"><input type="checkbox" class="fp-c-activo"' + (c.activo ? ' checked' : '') + '></td>' +
+    '<td><button onclick="this.closest(\'tr\').remove()" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px" title="Quitar canal">🗑</button></td>' +
+  '</tr>';
+}
+
+function fpAgregarCanal() {
+  var tbody = document.querySelector('#fp-canales tbody');
+  var nombres = _fpParams.canales.map(function(c){ return c.canal; });
+  tbody.insertAdjacentHTML('beforeend', fpFilaCanal({ canal:'', comisionPct:null, baseComision:'FINAL', descuentoPct:0, referencia:'', activo:true }, tbody.rows.length, nombres));
+}
+
+function fpLeerFormulario() {
+  var num = function(id) { var v = document.getElementById(id).value; return v === '' ? null : parseFloat(v); };
+  var canales = [].map.call(document.querySelectorAll('#fp-canales tbody tr'), function(tr) {
+    var com = tr.querySelector('.fp-c-com').value;
+    return { canal: tr.querySelector('.fp-c-nombre').value.trim(), comisionPct: com === '' ? null : parseFloat(com),
+             baseComision: tr.querySelector('.fp-c-base').value, descuentoPct: parseFloat(tr.querySelector('.fp-c-desc').value) || 0,
+             referencia: tr.querySelector('.fp-c-ref').value, activo: tr.querySelector('.fp-c-activo').checked };
+  }).filter(function(c){ return c.canal; });
+  return { parametros: { IVA: num('fp-iva'), IIBB: num('fp-iibb'), SEG_HIGIENE: num('fp-seh'), COSTO_OBJETIVO: num('fp-obj') }, canales: canales };
+}
+
+function fpGuardarParametros() {
+  var data = fpLeerFormulario();
+  if (!(data.parametros.COSTO_OBJETIVO > 0)) return toast('Cargá el costo de venta objetivo', false);
+  apiPost('guardarParametrosVenta', data).then(function(r) {
+    if (!r.ok) return toast('Error: ' + (r.msg || r.error || ''), false);
+    toast('Parámetros guardados ✓');
+    fpCargar();
+  }).catch(function(e){ toast('Error: ' + e.message, false); });
+}
+
+function fpFmt(n) { return '$ ' + Math.round(n || 0).toLocaleString('es-AR'); }
+
+function fpRenderTabla() {
+  if (!_fpParams || !_prodCache) return;
+  var rubro = document.getElementById('fp-rubro').value, carta = document.getElementById('fp-carta').value;
+  var busq = (document.getElementById('fp-buscar').value || '').toLowerCase().trim();
+  var canales = _fpParams.canales.filter(function(c){ return c.activo; });
+  var lista = _prodCache.filter(function(p) {
+    return (!rubro || p.rubro === rubro) && (!carta || p.enCarta) && (!busq || p.nombre.toLowerCase().indexOf(busq) >= 0);
+  });
+  if (!lista.length) { document.getElementById('fp-tabla').innerHTML = '<div class="loading">No hay productos para el filtro.</div>'; return; }
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Producto</th>' +
+    '<th style="text-align:right">Costo de producción</th><th style="text-align:right">Precio actual</th>' +
+    canales.map(function(c){ return '<th style="text-align:right">' + c.canal + (c.referencia ? '<div style="font-size:9px;font-weight:400">' + c.referencia + ' −' + c.descuentoPct + '%</div>' : '') + '</th>'; }).join('') +
+    '</tr></thead><tbody>';
+  lista.forEach(function(p) {
+    var sug = fpPreciosSugeridos(p.costoCalculado, _fpParams.parametros, _fpParams.canales);
+    html += '<tr style="cursor:pointer" onclick="fpVerDetalle(\'' + p.nombre.replace(/'/g, "\\'") + '\')">' +
+      '<td style="font-weight:600;color:var(--verde)">' + p.nombre + '</td>' +
+      '<td class="num">' + (p.costoCalculado > 0 ? fpFmt(p.costoCalculado) : '<span style="color:var(--rojo);font-size:10px">sin costo</span>') + '</td>' +
+      '<td class="num" style="color:#8a7a5a">' + (p.precioVenta > 0 ? fpFmt(p.precioVenta) : '—') + '</td>' +
+      canales.map(function(c) {
+        var r = sug[c.canal] || {};
+        if (r.sinCosto) return '<td class="num" style="color:#ccc">—</td>';
+        if (r.inviable) return '<td class="num" style="color:var(--rojo);font-size:10px;font-weight:600">no alcanza</td>';
+        if (r.sinReferencia) return '<td class="num" style="color:#ccc">—</td>';
+        return '<td class="num" style="font-weight:600">' + fpFmt(r.precioFinal) + (r.aConfirmar ? '<span title="Comisión a confirmar" style="color:#f4a21d"> *</span>' : '') + '</td>';
+      }).join('') + '</tr>';
+  });
+  html += '</tbody></table></div><div style="font-size:11px;color:#8a7a5a;margin-top:8px">Precios con IVA, redondeados a $100. ' +
+    '<span style="color:#f4a21d">*</span> comisión a confirmar (calculada como 0%). "No alcanza": con esa comisión el objetivo es imposible. Hacé clic en un producto para ver el desglose.</div>';
+  document.getElementById('fp-tabla').innerHTML = html;
+}
+
+function fpVerDetalle(nombre) {
+  var p = (_prodCache || []).find(function(x){ return x.nombre === nombre; });
+  if (!p || !_fpParams) return;
+  _fpProductoSel = nombre;
+  var par = _fpParams.parametros;
+  var canales = _fpParams.canales.filter(function(c){ return c.activo; });
+  var sug = fpPreciosSugeridos(p.costoCalculado, par, _fpParams.canales);
+  var cols = canales.map(function(c){ return { titulo: c.canal + ' (sugerido)', d: sug[c.canal] || {} }; });
+  // Precio actual: el mismo precio de carta analizado en cada canal (sin descuentos).
+  if (p.precioVenta > 0) canales.forEach(function(c) {
+    cols.push({ titulo: c.canal + ' a precio actual', d: fpDesglose(p.precioVenta, p.costoCalculado, c, par), actual: true });
+  });
+  var filas = [
+    ['Precio final (con IVA)', 'precioFinal', true],
+    ['IVA ' + (par.IVA||0) + '%', 'iva'],
+    ['Precio neto de IVA', 'neto', true],
+    ['Costo de producción', 'costoProd'],
+    ['IIBB ' + (par.IIBB||0) + '%', 'iibb'],
+    ['Seg. e Higiene ' + (par.SEG_HIGIENE||0) + '%', 'seh'],
+    ['Comisión del canal', 'comision'],
+    ['Gastos de venta', 'gastosVenta', true],
+    ['Costo de venta', 'costoVenta', true],
+    ['Costo de venta % s/neto', 'pctCosto', true],
+    ['Margen sobre el neto', 'margen', true]
+  ];
+  var obj = parseFloat(par.COSTO_OBJETIVO) || 30;
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla" style="font-size:11px"><thead><tr><th>Concepto</th>' +
+    cols.map(function(c){ return '<th style="text-align:right;' + (c.actual ? 'background:#5a6b3a' : '') + '">' + c.titulo + '</th>'; }).join('') + '</tr></thead><tbody>';
+  filas.forEach(function(f) {
+    html += '<tr' + (f[2] ? ' style="font-weight:600"' : '') + '><td>' + f[0] + '</td>' + cols.map(function(c) {
+      var d = c.d;
+      if (d.inviable) return '<td class="num" style="color:var(--rojo)">' + (f[1] === 'precioFinal' ? 'no alcanza' : '') + '</td>';
+      if (d.sinCosto || d.sinReferencia || d.precioFinal === undefined) return '<td class="num" style="color:#ccc">—</td>';
+      if (f[1] === 'pctCosto') {
+        var col = d.pctCosto <= obj + 0.05 ? 'var(--oliva)' : d.pctCosto <= obj * 1.2 ? 'var(--amarillo)' : 'var(--rojo)';
+        return '<td class="num" style="color:' + col + '">' + d.pctCosto.toFixed(1) + '%</td>';
+      }
+      var v = d[f[1]];
+      return '<td class="num"' + (f[1] === 'margen' && v < 0 ? ' style="color:var(--rojo)"' : '') + '>' + fpFmt(v) + '</td>';
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  var avisos = [];
+  canales.forEach(function(c) {
+    var r = sug[c.canal] || {};
+    if (r.inviable) avisos.push('<strong>' + c.canal + '</strong>: con una comisión de ' + c.comisionPct + '% el costo de venta no puede quedar en el ' + obj + '% (IIBB + SeH + comisión ya suman ' + ((fpPct(par.IIBB) + fpPct(par.SEG_HIGIENE) + r.comEf) * 100).toFixed(1) + '% del neto).');
+    if (r.aConfirmar && !c.referencia) avisos.push('<strong>' + c.canal + '</strong>: comisión a confirmar, calculada como 0%.');
+  });
+  if (!(p.costoCalculado > 0)) avisos.push('El producto no tiene costo de producción: revisá su receta.');
+  if (avisos.length) html += '<div style="background:#fff3cd;border:1px solid #f4a21d;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:11px;color:#856404;line-height:1.6">⚠ ' + avisos.join('<br>⚠ ') + '</div>';
+  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">"A precio actual" muestra el precio de carta de hoy (último precio de venta registrado) analizado en cada canal, para comparar contra el sugerido.</div>';
+  document.getElementById('fp-detalle-titulo').textContent = 'Desglose: ' + p.nombre + ' · costo de producción ' + fpFmt(p.costoCalculado);
+  document.getElementById('fp-detalle').innerHTML = html;
+  var card = document.getElementById('fp-detalle-card');
+  card.style.display = '';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // TOAST
