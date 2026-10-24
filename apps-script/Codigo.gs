@@ -46,7 +46,7 @@ function doGet(e) {
     else if (action === 'insumos')          result = getInsumos();
     else if (action === 'subrecetas')       result = getSubrecetasCompleto();
     else if (action === 'parametrosVenta')  result = getParametrosVenta();
-    else result = { ok: true, msg: 'Papá Andrés API v2.3' };
+    else result = { ok: true, msg: 'Papá Andrés API v2.4' };
 
     return _json(result);
   } catch(err) {
@@ -106,6 +106,7 @@ function doPost(e) {
     else if (action === 'actualizarSubreceta')      result = actualizarSubreceta(data);
     else if (action === 'agregarSubreceta')         result = agregarSubreceta(data);
     else if (action === 'guardarParametrosVenta')   result = guardarParametrosVenta(data);
+    else if (action === 'guardarPreciosVenta')      result = guardarPreciosVenta(data);
     else result = { ok: false, msg: 'Acción no reconocida: ' + action };
 
     return _json(result);
@@ -1088,6 +1089,8 @@ function getProductos(fechaCorte) {
   var modelo = _modeloCostos(fechaCorte);
   var calcularCosto = modelo.calcularCosto, enriquecerIngredientes = modelo.enriquecerIngredientes;
   var preciosVenta  = getPreciosUltimaVenta();
+  var preciosCarta  = getPreciosCarta();
+  var canalPrincipal = _pvCanalPrincipal(getParametrosVenta().canales);
 
   var dataP = sheetP.getDataRange().getValues();
   var headersP = dataP[0];
@@ -1104,8 +1107,17 @@ function getProductos(fechaCorte) {
     var precioVentaSheet  = parseFloat(row[colPrecioV]) || 0;
     var foodCostTarget    = parseFloat(row[colFoodCost]) || 30;
 
+    // Prioridad del precio: 1) precio de carta del canal principal (definido en la app),
+    // 2) promedio del último mes importado (incluye envío), 3) valor histórico de la hoja Productos.
     var ventaRef    = preciosVenta[nombre];
-    var precioVenta = ventaRef ? ventaRef.precio : precioVentaSheet;
+    var carta       = preciosCarta[nombre] || {};
+    var precioCarta = canalPrincipal && carta[canalPrincipal] ? carta[canalPrincipal].precio : 0;
+    var precioVenta, fuentePrecio;
+    if (precioCarta > 0)      { precioVenta = precioCarta;    fuentePrecio = 'carta'; }
+    else if (ventaRef)        { precioVenta = ventaRef.precio; fuentePrecio = 'ventas/' + ventaRef.mes; }
+    else                      { precioVenta = precioVentaSheet; fuentePrecio = 'manual'; }
+    var preciosCanal = {};
+    Object.keys(carta).forEach(function(c) { preciosCanal[c] = carta[c].precio; });
     var costoCalculado = calcularCosto(nombre, {});
     var foodCostReal = precioVenta > 0 ? (costoCalculado / precioVenta) * 100 : 0;
     var margen       = precioVenta > 0 ? precioVenta - costoCalculado : 0;
@@ -1121,7 +1133,11 @@ function getProductos(fechaCorte) {
       margen: Math.round(margen),
       margenPct: Math.round(margenPct * 10) / 10,
       precioSugerido: foodCostTarget > 0 ? Math.round(costoCalculado / (foodCostTarget/100)) : 0,
-      fuentePrecio: ventaRef ? ('ventas/' + ventaRef.mes) : 'manual',
+      fuentePrecio: fuentePrecio,
+      canalPrincipal: canalPrincipal,
+      preciosCanal: preciosCanal,
+      precioPromedioVentas: ventaRef ? ventaRef.precio : 0,
+      mesPromedioVentas: ventaRef ? ventaRef.mes + ' ' + ventaRef.anio : '',
       ingredientes: enriquecerIngredientes(nombre, {})
     };
   });
@@ -1180,6 +1196,14 @@ function eliminarProducto(nombre) {
     var rowsR = sheetR.getDataRange().getValues();
     for (var j = rowsR.length - 1; j >= 1; j--) {
       if (String(rowsR[j][0]).trim().toUpperCase() === nombreUp) { sheetR.deleteRow(j+1); borradasRec++; }
+    }
+  }
+  // Sus precios de carta por canal también se van.
+  var sheetPV = ss.getSheetByName('PreciosVenta');
+  if (borradoProd && sheetPV && sheetPV.getLastRow() > 1) {
+    var rowsPV = sheetPV.getDataRange().getValues();
+    for (var k = rowsPV.length - 1; k >= 1; k--) {
+      if (String(rowsPV[k][0]).trim().toUpperCase() === nombreUp) sheetPV.deleteRow(k+1);
     }
   }
   return { ok: borradoProd, borradasRec: borradasRec };
@@ -1496,7 +1520,97 @@ function guardarParametrosVenta(data) {
     });
     if (sC.getLastRow() > 1) sC.getRange(2, 1, sC.getLastRow() - 1, 6).clearContent();
     if (filasC.length) sC.getRange(2, 1, filasC.length, 6).setValues(filasC);
+
+    // Si se renombró un canal, sus precios de carta lo acompañan.
+    var ren = {};
+    (data.renombres || []).forEach(function(r) {
+      var de = String(r && r.de || '').trim(), a = String(r && r.a || '').trim();
+      if (de && a && de !== a) ren[de] = a;
+    });
+    var sPV = getSpreadsheet().getSheetByName('PreciosVenta');
+    if (Object.keys(ren).length && sPV && sPV.getLastRow() > 1) {
+      var rng = sPV.getRange(2, 2, sPV.getLastRow() - 1, 1);
+      var vals = rng.getValues().map(function(r) {
+        var c = String(r[0] || '').trim();
+        return [ren[c] !== undefined ? ren[c] : r[0]];
+      });
+      rng.setValues(vals);
+    }
     return { ok: true };
+  });
+}
+
+// ============================================================
+// PRECIOS DE CARTA POR CANAL (definidos en la app)
+// Hoja PreciosVenta: Producto | Canal | Precio (final, con IVA) | Actualizado
+// ============================================================
+var PV_PRECIOS_HEADERS = ['Producto', 'Canal', 'Precio', 'Actualizado'];
+
+// Canal cuyo precio se usa para márgenes, semáforo y análisis marginal:
+// el primer canal activo con precio propio (sin "precio basado en").
+function _pvCanalPrincipal(canales) {
+  var c = (canales || []).filter(function(x) { return x.activo && !x.referencia; })[0];
+  return c ? c.canal : '';
+}
+
+// { PRODUCTO: { Canal: { precio, actualizado } } }
+function getPreciosCarta() {
+  var sheet = getSpreadsheet().getSheetByName('PreciosVenta');
+  var mapa = {};
+  if (!sheet || sheet.getLastRow() <= 1) return mapa;
+  sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues().forEach(function(r) {
+    var prod = String(r[0] || '').trim().toUpperCase();
+    var canal = String(r[1] || '').trim();
+    var precio = _pvNum(r[2]);
+    if (!prod || !canal || !(precio > 0)) return;
+    if (!mapa[prod]) mapa[prod] = {};
+    mapa[prod][canal] = { precio: precio, actualizado: r[3] instanceof Date ? r[3].toLocaleDateString('es-AR') : String(r[3] || '') };
+  });
+  return mapa;
+}
+
+// data: { precios: [{producto, canal, precio}] }  — precio vacío o 0 borra ese precio.
+function guardarPreciosVenta(data) {
+  var cambios = (data && data.precios) || [];
+  if (!cambios.length) return { ok: false, msg: 'No hay precios para guardar' };
+  return _vConLock(function() {
+    var sheet = _pvHoja('PreciosVenta', PV_PRECIOS_HEADERS, []);
+    var filas = sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).getValues() : [];
+    var idx = {};
+    filas.forEach(function(r, i) {
+      var k = String(r[0] || '').trim().toUpperCase() + '|' + String(r[1] || '').trim();
+      idx[k] = i;
+    });
+    var hoy = new Date();
+    var guardados = 0, borrados = 0;
+    cambios.forEach(function(c) {
+      var prod = String(c.producto || '').trim().toUpperCase();
+      var canal = String(c.canal || '').trim();
+      if (!prod || !canal) return;
+      var precio = _pvNum(c.precio);
+      var k = prod + '|' + canal;
+      if (precio > 0) {
+        var fila = [prod, canal, Math.round(precio * 100) / 100, hoy];
+        if (idx[k] !== undefined) filas[idx[k]] = fila;
+        else { idx[k] = filas.length; filas.push(fila); }
+        guardados++;
+      } else if (idx[k] !== undefined) {
+        filas[idx[k]] = null;
+        borrados++;
+      }
+    });
+    var finales = filas.filter(function(r) { return r && r[0]; });
+    finales.sort(function(a, b) {
+      var pa = String(a[0]), pb = String(b[0]);
+      return pa < pb ? -1 : pa > pb ? 1 : (String(a[1]) < String(b[1]) ? -1 : 1);
+    });
+    if (sheet.getLastRow() > 1) sheet.getRange(2, 1, sheet.getLastRow() - 1, 4).clearContent();
+    if (finales.length) {
+      sheet.getRange(2, 1, finales.length, 4).setValues(finales);
+      sheet.getRange(2, 3, finales.length, 1).setNumberFormat('#,##0.00');
+      sheet.getRange(2, 4, finales.length, 1).setNumberFormat('dd/MM/yyyy');
+    }
+    return { ok: true, guardados: guardados, borrados: borrados };
   });
 }
 

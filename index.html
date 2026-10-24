@@ -781,7 +781,18 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
           <div id="fp-parametros"><div class="loading">Cargando parámetros...</div></div>
         </div>
         <div class="card" style="margin-bottom:14px">
-          <div class="card-title">Precios sugeridos por canal</div>
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <span>Precios de carta por canal</span>
+            <span style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-secondary btn-sm" onclick="fpCompletarSugeridos()" title="Completa con el precio sugerido solo los campos vacíos de los productos filtrados">Completar vacíos con sugeridos</button>
+              <button class="btn btn-secondary btn-sm" id="fp-descartar-precios" onclick="fpDescartarPrecios()" style="display:none">Descartar cambios</button>
+              <button class="btn btn-primary btn-sm" id="fp-guardar-precios" onclick="fpGuardarPrecios()" disabled>💾 Guardar precios</button>
+            </span>
+          </div>
+          <p style="font-size:12px;color:#8a7a5a;margin-bottom:12px;line-height:1.6">
+            Acá se definen los <strong>precios de venta</strong> de cada producto por canal. Son los que usa la app para márgenes, semáforo y análisis marginal, en lugar del promedio de los reportes de RestoSimple (que trae el envío incluido).
+            Las ventas del Estado de Resultados siguen siendo las reales importadas. Si un producto no tiene precio de carta, se sigue usando el promedio importado.
+          </p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end">
             <div><label class="form-label">Rubro</label><select id="fp-rubro" class="form-input" onchange="fpRenderTabla()"><option value="">Todos los rubros</option></select></div>
             <div><label class="form-label">En carta</label><select id="fp-carta" class="form-input" onchange="fpRenderTabla()"><option value="SI">Solo en carta</option><option value="">Todos</option></select></div>
@@ -1647,7 +1658,7 @@ function buildProductSelect(){
   return html;
 }
 function agregarItemRow(){_itemCount++;var id=_itemCount;var div=document.createElement('div');div.className='item-row';div.id='item-row-'+id;div.innerHTML='<div><label class="form-label">Producto</label><select class="form-input" id="i-prod-'+id+'" onchange="onSeleccionarProducto('+id+')">'+buildProductSelect()+'</select><input type="text" class="form-input" id="i-prod-txt-'+id+'" placeholder="Escribir producto..." style="display:none;margin-top:4px"></div><div><label class="form-label">Cant.</label><input type="number" class="form-input" id="i-cant-'+id+'" value="1" min="1" oninput="calcItemSubtotal('+id+')"></div><div><label class="form-label">Precio unit. ($)</label><input type="number" class="form-input" id="i-precio-'+id+'" placeholder="0" oninput="calcItemSubtotal('+id+')"></div><div><label class="form-label">Subtotal</label><div class="item-subtotal" id="i-sub-'+id+'">$ 0</div></div><button class="item-remove" onclick="quitarItemRow('+id+')" title="Quitar">✕</button>';document.getElementById('items-list').appendChild(div);actualizarTotalManual();}
-function onSeleccionarProducto(id){var sel=document.getElementById('i-prod-'+id);var txt=document.getElementById('i-prod-txt-'+id);txt.style.display=sel.value==='__otro__'?'block':'none';if(sel.value!=='__otro__')txt.value='';}
+function onSeleccionarProducto(id){var sel=document.getElementById('i-prod-'+id);var txt=document.getElementById('i-prod-txt-'+id);txt.style.display=sel.value==='__otro__'?'block':'none';if(sel.value!=='__otro__')txt.value='';var inpP=document.getElementById('i-precio-'+id);if(sel.value&&sel.value!=='__otro__'){var pc=precioCartaVentaManual(sel.value);if(pc>0){inpP.value=pc;calcItemSubtotal(id);}}}
 function calcItemSubtotal(id){var cant=parseFloat(document.getElementById('i-cant-'+id).value)||0;var precio=parseFloat(document.getElementById('i-precio-'+id).value)||0;document.getElementById('i-sub-'+id).textContent='$ '+Math.round(cant*precio).toLocaleString('es-AR');actualizarTotalManual();}
 function quitarItemRow(id){var row=document.getElementById('item-row-'+id);if(row)row.remove();actualizarTotalManual();}
 function actualizarTotalManual(){var totalItems=0;for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var cant=parseFloat(document.getElementById('i-cant-'+i)&&document.getElementById('i-cant-'+i).value)||0;var precio=parseFloat(document.getElementById('i-precio-'+i)&&document.getElementById('i-precio-'+i).value)||0;totalItems+=cant*precio;}var desc=parseFloat(document.getElementById('m-descuentos').value)||0;document.getElementById('m-total-display').textContent='$ '+Math.round(totalItems-desc).toLocaleString('es-AR');}
@@ -1655,6 +1666,27 @@ function abrirCargaManual(){var hoy=new Date();var yy=hoy.getFullYear(),mm=Strin
   // Asegurar que _prodCache esté disponible para el select dinámico
   if (_prodCache && _prodCache.length) { agregarItemRow(); }
   else { apiGet('productos').then(function(data){ _prodCache=data||[]; agregarItemRow(); }).catch(function(){ agregarItemRow(); }); }
+  // Canales de venta, para completar el precio de carta al elegir un producto
+  if (!_fpParams) apiGet('parametrosVenta').then(function(d){ if (!_fpParams) _fpParams = d || null; }).catch(function(){});
+}
+
+// Precio de carta para la venta manual: el canal que coincide con la plataforma elegida;
+// si no hay, el que coincide con el método de pago (ej. Efectivo); si no, el canal principal.
+function precioCartaVentaManual(nombreProd) {
+  var p = (_prodCache || []).find(function(x){ return x.nombre === nombreProd; });
+  if (!p) return 0;
+  if (!_fpParams) return p.fuentePrecio === 'carta' ? p.precioVenta : 0;
+  var platSel = document.getElementById('m-plataforma');
+  var plat = platSel && platSel.options[platSel.selectedIndex] ? platSel.options[platSel.selectedIndex].text : '';
+  var metodo = (document.getElementById('m-metodo') || {}).value || '';
+  var candidatos = [plat, metodo, _pvPrincipalFront()];
+  for (var i = 0; i < candidatos.length; i++) {
+    var c = fpBuscarCanal(candidatos[i]);
+    if (!c || !c.activo) continue;
+    var precio = fpPrecioVigente(p, c.canal);
+    if (precio > 0) return precio;
+  }
+  return 0;
 }
 function cerrarCargaManual(){document.getElementById('modal-manual').style.display='none';document.getElementById('modal-overlay').style.display='none';}
 function guardarVentaManual(){var mes=parseInt(document.getElementById('v-mes').value);var fechaInput=document.getElementById('m-fecha').value;var total=0;var items=[];for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var selProd=document.getElementById('i-prod-'+i);var txtProd=document.getElementById('i-prod-txt-'+i);var prod=selProd.value==='__otro__'?txtProd.value.trim():selProd.value;var cant=parseFloat(document.getElementById('i-cant-'+i).value)||1;var precio=parseFloat(document.getElementById('i-precio-'+i).value)||0;if(!prod||!precio)continue;items.push({producto:prod,cantidad:cant,precioUnit:precio,subtotal:cant*precio});total+=cant*precio;}if(!fechaInput||!items.length){toast('Completá fecha y al menos un producto con precio',false);return;}var partes=fechaInput.split('-');var fechaFmt=partes[2]+'/'+partes[1]+'/'+partes[0];var platSel=document.getElementById('m-plataforma');var platNombre=platSel.options[platSel.selectedIndex]?platSel.options[platSel.selectedIndex].text:'Manual';if(platSel.value==='nueva'){toast('Guardá primero la plataforma nueva',false);return;}var data={mes:MESES[parseInt(partes[1],10)]||MESES[mes],fecha:fechaFmt,plataforma:platNombre,metodo:document.getElementById('m-metodo').value,descuentos:parseFloat(document.getElementById('m-descuentos').value)||0,items:items};cerrarCargaManual();toast('Guardando...');apiPost('registrarVentaManual',data).then(function(r){if(r.ok){toast('Venta registrada ✓');cargarModuloVentas();}else toast('Error: '+(r.msg||''),false);});}
@@ -2347,9 +2379,11 @@ function prodRenderListado(lista) {
       var target = p.foodCostTarget;
       var semColor = fc <= target ? '#657a2d' : fc <= target*1.2 ? '#f4a21d' : '#d61220';
       var semEmoji = fc <= target ? '🟢' : fc <= target*1.2 ? '🟡' : '🔴';
-      var fuenteTag = p.fuentePrecio && p.fuentePrecio.indexOf('ventas') === 0
-        ? '<span style="font-size:9px;background:#e8f0c8;color:#657a2d;padding:1px 5px;border-radius:8px;margin-left:4px">ventas</span>'
-        : '<span style="font-size:9px;background:#f0e4cc;color:#8a7a5a;padding:1px 5px;border-radius:8px;margin-left:4px">manual</span>';
+      var fuenteTag = p.fuentePrecio === 'carta'
+        ? '<span title="Precio de carta de ' + (p.canalPrincipal || '') + ', definido en Costos y precios de venta" style="font-size:9px;background:#e8f0c8;color:#657a2d;padding:1px 5px;border-radius:8px;margin-left:4px">carta</span>'
+        : p.fuentePrecio && p.fuentePrecio.indexOf('ventas') === 0
+        ? '<span title="Sin precio de carta: promedio de ventas importadas (' + (p.mesPromedioVentas || '') + '), incluye envío" style="font-size:9px;background:#fff3cd;color:#856404;padding:1px 5px;border-radius:8px;margin-left:4px">prom. ventas</span>'
+        : '<span title="Sin precio de carta ni ventas importadas: valor histórico de la hoja Productos" style="font-size:9px;background:#f0e4cc;color:#8a7a5a;padding:1px 5px;border-radius:8px;margin-left:4px">manual</span>';
 
       html += '<tr>'+
         '<td style="font-weight:500;color:var(--verde)">'+p.nombre+(p.enCarta?'':' <span style="font-size:10px;color:#8a7a5a">(fuera carta)</span>')+'</td>'+
@@ -2955,7 +2989,7 @@ function amRender(lista, modoVentas) {
   html += '</tbody></table></div></div>';
 
   var nota = '<div style="background:#fdf8f0;border:1px solid #e8d9b8;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:11px;color:#8a7a5a">'+
-    'ℹ️ Los costos se calculan con el precio de la <strong>última compra registrada</strong>. El precio de venta proviene de las <strong>ventas reales</strong> o del valor manual. Las unidades vendidas corresponden al mes seleccionado.'+
+    'ℹ️ Los costos se calculan con el precio de la <strong>última compra registrada</strong>. El precio de venta es el <strong>precio de carta del canal principal</strong> (Costos y precios de venta); si un producto no lo tiene, se usa el promedio de ventas importadas. Las unidades vendidas corresponden al mes seleccionado.'+
   '</div>';
 
   cont.innerHTML = kpis + html + nota;
@@ -3139,7 +3173,7 @@ function amExportarHTML() {
     '<div class="card"><div class="card-title">Productos por contribución marginal</div>'+
       '<table><thead><tr><th>#</th><th>Producto</th><th>Rubro</th><th style="text-align:right">Precio venta</th><th style="text-align:right">Costo</th><th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th><th style="text-align:right">Incidencia costo %</th><th style="min-width:190px">Barra</th></tr></thead>'+
       '<tbody>'+filas+'</tbody></table></div>'+
-    '<div class="nota">ℹ️ Costos calculados con precio de última compra de cada insumo. Precio de venta = promedio de ventas reales importadas.</div>'+
+    '<div class="nota">ℹ️ Costos calculados con precio de última compra de cada insumo. Precio de venta = precio de carta del canal principal; si no está cargado, promedio de ventas importadas (incluye envío).</div>'+
     '<div class="footer">Papá Andrés · Análisis Marginal · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
     '</div></body></html>';
 
@@ -3970,7 +4004,7 @@ function fpFilaCanal(c, i, nombres) {
   var optsRef = '<option value="">— Precio propio —</option>' + nombres.filter(function(n){ return n !== c.canal; }).map(function(n){
     return '<option value="' + n + '"' + (c.referencia === n ? ' selected' : '') + '>' + n + '</option>'; }).join('');
   var com = c.comisionPct === null || c.comisionPct === undefined ? '' : c.comisionPct;
-  return '<tr data-i="' + i + '">' +
+  return '<tr data-i="' + i + '" data-orig="' + String(c.canal || '').replace(/"/g, '&quot;') + '">' +
     '<td><input type="text" class="form-input fp-c-nombre" value="' + (c.canal||'') + '" style="min-width:130px"></td>' +
     '<td><input type="number" step="0.01" class="form-input fp-c-com" value="' + com + '" placeholder="a confirmar" style="max-width:120px"></td>' +
     '<td><select class="form-input fp-c-base"><option value="FINAL"' + (c.baseComision !== 'NETO' ? ' selected' : '') + '>Precio final (con IVA)</option><option value="NETO"' + (c.baseComision === 'NETO' ? ' selected' : '') + '>Precio neto (sin IVA)</option></select></td>' +
@@ -3995,8 +4029,11 @@ function fpLeerFormulario() {
              baseComision: tr.querySelector('.fp-c-base').value, descuentoPct: parseFloat(tr.querySelector('.fp-c-desc').value) || 0,
              referencia: tr.querySelector('.fp-c-ref').value, activo: tr.querySelector('.fp-c-activo').checked };
   }).filter(function(c){ return c.canal; });
+  var renombres = [].map.call(document.querySelectorAll('#fp-canales tbody tr'), function(tr) {
+    return { de: tr.getAttribute('data-orig') || '', a: tr.querySelector('.fp-c-nombre').value.trim() };
+  }).filter(function(r){ return r.de && r.a && r.de !== r.a; });
   var ini = (document.getElementById('fp-inicio').value || '').replace('-', '');
-  return { parametros: { IVA: num('fp-iva'), IIBB: num('fp-iibb'), SEG_HIGIENE: num('fp-seh'), COSTO_OBJETIVO: num('fp-obj'),
+  return { renombres: renombres, parametros: { IVA: num('fp-iva'), IIBB: num('fp-iibb'), SEG_HIGIENE: num('fp-seh'), COSTO_OBJETIVO: num('fp-obj'),
                          INICIO_FACTURACION: ini ? parseInt(ini, 10) : null }, canales: canales };
 }
 
@@ -4006,45 +4043,212 @@ function fpGuardarParametros() {
   apiPost('guardarParametrosVenta', data).then(function(r) {
     if (!r.ok) return toast('Error: ' + (r.msg || r.error || ''), false);
     toast('Parámetros guardados ✓');
+    if (data.renombres.length) {
+      // Los precios ya se movieron al nombre nuevo en la hoja; acompañar también los cambios sin guardar.
+      var mapa = {}; data.renombres.forEach(function(r){ mapa[r.de] = r.a; });
+      var nuevos = {};
+      Object.keys(_fpEdits).forEach(function(k) {
+        var i = k.lastIndexOf('|'), canal = k.slice(i + 1);
+        nuevos[k.slice(0, i) + '|' + (mapa[canal] || canal)] = _fpEdits[k];
+      });
+      _fpEdits = nuevos;
+      _prodCache = null;
+    }
     fpCargar();
   }).catch(function(e){ toast('Error: ' + e.message, false); });
 }
 
 function fpFmt(n) { return '$ ' + Math.round(n || 0).toLocaleString('es-AR'); }
 
+// ---- Precios de carta por canal ----
+// _fpEdits: cambios sin guardar, clave "PRODUCTO|Canal" -> texto del input ('' = borrar precio)
+var _fpEdits = {};
+
+function fpClave(prod, canal) { return prod + '|' + canal; }
+function fpCanalesActivos() { return (_fpParams ? _fpParams.canales : []).filter(function(c){ return c.activo; }); }
+function fpBuscarCanal(nombre) {
+  var n = String(nombre || '').trim().toLowerCase();
+  return (_fpParams ? _fpParams.canales : []).filter(function(c){ return c.canal.toLowerCase() === n; })[0] || null;
+}
+
+// Precio vigente (final, con IVA) de un producto en un canal: el cargado (o editado sin guardar) si tiene
+// precio propio; si el canal se basa en otro, el de ese canal menos el descuento (redondeado a $100).
+function fpPrecioVigente(p, canalNombre, prof) {
+  prof = prof || 0;
+  var c = fpBuscarCanal(canalNombre);
+  if (!c || prof > 5) return 0;
+  if (c.referencia) {
+    var base = fpPrecioVigente(p, c.referencia, prof + 1);
+    return base > 0 ? Math.round(base * (1 - fpPct(c.descuentoPct)) / 100) * 100 : 0;
+  }
+  var k = fpClave(p.nombre, c.canal);
+  if (_fpEdits.hasOwnProperty(k)) return parseFloat(_fpEdits[k]) || 0;
+  return (p.preciosCanal && p.preciosCanal[c.canal]) || 0;
+}
+
+function fpPctHtml(precio, p, c) {
+  if (!(precio > 0) || !(p.costoCalculado > 0)) return '';
+  var obj = parseFloat(_fpParams.parametros.COSTO_OBJETIVO) || 30;
+  var d = fpDesglose(precio, p.costoCalculado, c, _fpParams.parametros);
+  var col = d.pctCosto <= obj + 0.05 ? 'var(--oliva)' : d.pctCosto <= obj * 1.2 ? 'var(--amarillo)' : 'var(--rojo)';
+  return '<span title="Costo de venta sobre el precio neto de IVA" style="color:' + col + ';font-weight:600">' + d.pctCosto.toFixed(1) + '%</span>';
+}
+
+function fpSugHtml(r) {
+  if (!r || r.sinCosto || r.sinReferencia) return '<span style="color:#ccc">sug. —</span>';
+  if (r.inviable) return '<span style="color:var(--rojo);font-weight:600">sug. no alcanza</span>';
+  return 'sug. ' + fpFmt(r.precioFinal) + (r.aConfirmar ? '<span title="Comisión a confirmar" style="color:#f4a21d">*</span>' : '');
+}
+
+function fpCeldasCanal(p, c, sug) {
+  var precio = fpPrecioVigente(p, c.canal);
+  var r = sug[c.canal];
+  if (c.referencia) {
+    return '<td class="num" data-fp-canal="' + c.canal + '"><div style="font-weight:600">' + (precio > 0 ? fpFmt(precio) : '<span style="color:#ccc">—</span>') + '</div>' +
+      '<div style="font-size:10px;color:#8a7a5a">' + fpPctHtml(precio, p, c) + '</div></td>';
+  }
+  var k = fpClave(p.nombre, c.canal);
+  var editado = _fpEdits.hasOwnProperty(k);
+  var valor = editado ? _fpEdits[k] : ((p.preciosCanal && p.preciosCanal[c.canal]) || '');
+  var placeholder = r && r.precioFinal ? Math.round(r.precioFinal) : '';
+  return '<td class="num" data-fp-canal="' + c.canal + '" style="min-width:118px">' +
+    '<input type="number" min="0" step="100" class="form-input fp-precio" value="' + valor + '" placeholder="' + placeholder + '"' +
+    ' data-prod="' + p.nombre.replace(/"/g, '&quot;') + '" data-canal="' + c.canal.replace(/"/g, '&quot;') + '"' +
+    ' oninput="fpOnPrecio(this)" style="max-width:110px;text-align:right;padding:4px 6px;' + (editado ? 'border-color:#f4a21d;background:#fffaf0' : '') + '">' +
+    '<div class="fp-info" style="font-size:10px;color:#8a7a5a;margin-top:2px">' + fpSugHtml(r) + ' · ' + (fpPctHtml(parseFloat(valor) || 0, p, c) || '—') + '</div></td>';
+}
+
 function fpRenderTabla() {
   if (!_fpParams || !_prodCache) return;
   var rubro = document.getElementById('fp-rubro').value, carta = document.getElementById('fp-carta').value;
   var busq = (document.getElementById('fp-buscar').value || '').toLowerCase().trim();
-  var canales = _fpParams.canales.filter(function(c){ return c.activo; });
+  var canales = fpCanalesActivos();
   var lista = _prodCache.filter(function(p) {
     return (!rubro || p.rubro === rubro) && (!carta || p.enCarta) && (!busq || p.nombre.toLowerCase().indexOf(busq) >= 0);
   });
+  fpActualizarBotonGuardar();
+  if (!canales.length) { document.getElementById('fp-tabla').innerHTML = '<div class="loading">No hay canales activos. Cargalos en los parámetros de arriba.</div>'; return; }
   if (!lista.length) { document.getElementById('fp-tabla').innerHTML = '<div class="loading">No hay productos para el filtro.</div>'; return; }
+  var principal = _pvPrincipalFront();
   var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Producto</th>' +
-    '<th style="text-align:right">Costo de producción</th><th style="text-align:right">Precio actual</th>' +
-    canales.map(function(c){ return '<th style="text-align:right">' + c.canal + (c.referencia ? '<div style="font-size:9px;font-weight:400">' + c.referencia + ' −' + c.descuentoPct + '%</div>' : '') + '</th>'; }).join('') +
+    '<th style="text-align:right">Costo de producción</th>' +
+    '<th style="text-align:right" title="Promedio del último mes importado de RestoSimple. Incluye el envío, por eso es solo de referencia.">Prom. ventas importadas</th>' +
+    canales.map(function(c){
+      return '<th style="text-align:right">' + c.canal + (c.canal === principal ? ' <span title="Canal principal: su precio se usa para márgenes y análisis marginal">★</span>' : '') +
+        (c.referencia ? '<div style="font-size:9px;font-weight:400">' + c.referencia + ' −' + c.descuentoPct + '%</div>' : '') + '</th>';
+    }).join('') +
     '</tr></thead><tbody>';
   lista.forEach(function(p) {
     var sug = fpPreciosSugeridos(p.costoCalculado, _fpParams.parametros, _fpParams.canales);
-    html += '<tr style="cursor:pointer" onclick="fpVerDetalle(\'' + p.nombre.replace(/'/g, "\\'") + '\')">' +
-      '<td style="font-weight:600;color:var(--verde)">' + p.nombre + '</td>' +
+    html += '<tr data-fp-prod="' + p.nombre.replace(/"/g, '&quot;') + '">' +
+      '<td><a href="javascript:void(0)" onclick="fpVerDetalle(\'' + p.nombre.replace(/'/g, "\\'") + '\')" style="font-weight:600;color:var(--verde);text-decoration:none" title="Ver desglose">' + p.nombre + ' ›</a></td>' +
       '<td class="num">' + (p.costoCalculado > 0 ? fpFmt(p.costoCalculado) : '<span style="color:var(--rojo);font-size:10px">sin costo</span>') + '</td>' +
-      '<td class="num" style="color:#8a7a5a">' + (p.precioVenta > 0 ? fpFmt(p.precioVenta) : '—') + '</td>' +
-      canales.map(function(c) {
-        var r = sug[c.canal] || {};
-        if (r.sinCosto) return '<td class="num" style="color:#ccc">—</td>';
-        if (r.inviable) return '<td class="num" style="color:var(--rojo);font-size:10px;font-weight:600">no alcanza</td>';
-        if (r.sinReferencia) return '<td class="num" style="color:#ccc">—</td>';
-        return '<td class="num" style="font-weight:600">' + fpFmt(r.precioFinal) + (r.aConfirmar ? '<span title="Comisión a confirmar" style="color:#f4a21d"> *</span>' : '') + '</td>';
-      }).join('') + '</tr>';
+      '<td class="num" style="color:#8a7a5a"' + (p.mesPromedioVentas ? ' title="' + p.mesPromedioVentas + '"' : '') + '>' + (p.precioPromedioVentas > 0 ? fpFmt(p.precioPromedioVentas) : '—') + '</td>' +
+      canales.map(function(c) { return fpCeldasCanal(p, c, sug); }).join('') + '</tr>';
   });
-  html += '</tbody></table></div><div style="font-size:11px;color:#8a7a5a;margin-top:8px">Precios con IVA, redondeados a $100. ' +
-    '<span style="color:#f4a21d">*</span> comisión a confirmar (calculada como 0%). "No alcanza": con esa comisión el objetivo es imposible. Hacé clic en un producto para ver el desglose.</div>';
+  html += '</tbody></table></div><div style="font-size:11px;color:#8a7a5a;margin-top:8px;line-height:1.6">Precios finales con IVA. Debajo de cada precio: el <strong>sugerido</strong> (si el campo está vacío, aparece en gris adentro) y el <strong>costo de venta % sobre el neto</strong> a ese precio. ' +
+    '<span style="color:#f4a21d">*</span> comisión a confirmar (calculada como 0%). Los canales con "precio basado en" se calculan solos. ' +
+    '★ = canal principal: su precio se usa en Productos y en el Análisis marginal. Hacé clic en un producto para ver el desglose.</div>';
   document.getElementById('fp-tabla').innerHTML = html;
 }
 
-function fpVerDetalle(nombre) {
+function _pvPrincipalFront() {
+  var c = (_fpParams ? _fpParams.canales : []).filter(function(x){ return x.activo && !x.referencia; })[0];
+  return c ? c.canal : '';
+}
+
+function fpOnPrecio(el) {
+  var prod = el.getAttribute('data-prod'), canal = el.getAttribute('data-canal');
+  var p = (_prodCache || []).find(function(x){ return x.nombre === prod; });
+  if (!p) return;
+  var k = fpClave(prod, canal);
+  var guardado = (p.preciosCanal && p.preciosCanal[canal]) || '';
+  var val = el.value.trim();
+  var sinGuardado = guardado === '' || !(parseFloat(guardado) > 0);
+  var igual = (val === '' && sinGuardado) || (val !== '' && !sinGuardado && parseFloat(val) === parseFloat(guardado));
+  if (igual) delete _fpEdits[k];
+  else _fpEdits[k] = val;
+  var editado = _fpEdits.hasOwnProperty(k);
+  el.style.borderColor = editado ? '#f4a21d' : '';
+  el.style.background = editado ? '#fffaf0' : '';
+  // Refrescar la info de la celda y de los canales derivados de la fila, sin re-dibujar los inputs.
+  var tr = el.closest('tr');
+  var sug = fpPreciosSugeridos(p.costoCalculado, _fpParams.parametros, _fpParams.canales);
+  fpCanalesActivos().forEach(function(c) {
+    var td = tr.querySelector('td[data-fp-canal="' + c.canal.replace(/"/g, '\\"') + '"]');
+    if (!td) return;
+    if (c.referencia) { td.outerHTML = fpCeldasCanal(p, c, sug); return; }
+    var info = td.querySelector('.fp-info');
+    var precio = fpPrecioVigente(p, c.canal);
+    if (info) info.innerHTML = fpSugHtml(sug[c.canal]) + ' · ' + (fpPctHtml(precio, p, c) || '—');
+  });
+  fpActualizarBotonGuardar();
+  if (_fpProductoSel === prod) fpVerDetalle(prod, true);
+}
+
+function fpCantidadCambios() { return Object.keys(_fpEdits).length; }
+
+function fpActualizarBotonGuardar() {
+  var n = fpCantidadCambios();
+  var b = document.getElementById('fp-guardar-precios');
+  if (b) { b.disabled = !n; b.textContent = n ? '💾 Guardar precios (' + n + ')' : '💾 Guardar precios'; }
+  var d = document.getElementById('fp-descartar-precios');
+  if (d) d.style.display = n ? '' : 'none';
+}
+
+function fpCompletarSugeridos() {
+  if (!_fpParams || !_prodCache) return;
+  var rubro = document.getElementById('fp-rubro').value, carta = document.getElementById('fp-carta').value;
+  var busq = (document.getElementById('fp-buscar').value || '').toLowerCase().trim();
+  var n = 0;
+  _prodCache.filter(function(p) {
+    return (!rubro || p.rubro === rubro) && (!carta || p.enCarta) && (!busq || p.nombre.toLowerCase().indexOf(busq) >= 0);
+  }).forEach(function(p) {
+    var sug = fpPreciosSugeridos(p.costoCalculado, _fpParams.parametros, _fpParams.canales);
+    fpCanalesActivos().filter(function(c){ return !c.referencia; }).forEach(function(c) {
+      var r = sug[c.canal];
+      if (fpPrecioVigente(p, c.canal) > 0 || !r || !(r.precioFinal > 0)) return;
+      _fpEdits[fpClave(p.nombre, c.canal)] = String(Math.round(r.precioFinal));
+      n++;
+    });
+  });
+  fpRenderTabla();
+  toast(n ? n + ' precios completados con el sugerido. Revisalos y guardá.' : 'No había precios vacíos con sugerido para completar');
+}
+
+function fpDescartarPrecios() {
+  if (!fpCantidadCambios()) return;
+  if (!confirm('¿Descartar los ' + fpCantidadCambios() + ' cambios de precio sin guardar?')) return;
+  _fpEdits = {};
+  fpRenderTabla();
+  if (_fpProductoSel) fpVerDetalle(_fpProductoSel, true);
+}
+
+function fpGuardarPrecios() {
+  var precios = Object.keys(_fpEdits).map(function(k) {
+    var i = k.lastIndexOf('|');
+    var v = String(_fpEdits[k]).trim();
+    return { producto: k.slice(0, i), canal: k.slice(i + 1), precio: v === '' ? null : parseFloat(v) };
+  });
+  if (!precios.length) return;
+  var malos = precios.filter(function(x){ return x.precio !== null && !(x.precio > 0); });
+  if (malos.length) return toast('Hay precios inválidos: ' + malos.map(function(x){ return x.producto; }).join(', '), false);
+  var b = document.getElementById('fp-guardar-precios');
+  if (b) { b.disabled = true; b.textContent = 'Guardando...'; }
+  apiPost('guardarPreciosVenta', { precios: precios }).then(function(r) {
+    if (!r.ok) { fpActualizarBotonGuardar(); return toast('Error: ' + (r.msg || r.error || ''), false); }
+    _fpEdits = {};
+    _prodCache = null;
+    toast('Precios guardados ✓' + (r.borrados ? ' (' + r.borrados + ' borrados)' : ''));
+    fpCargar();
+  }).catch(function(e){ fpActualizarBotonGuardar(); toast('Error: ' + e.message, false); });
+}
+
+window.addEventListener('beforeunload', function(e) {
+  if (typeof fpCantidadCambios === 'function' && fpCantidadCambios()) { e.preventDefault(); e.returnValue = ''; }
+});
+
+function fpVerDetalle(nombre, sinScroll) {
   var p = (_prodCache || []).find(function(x){ return x.nombre === nombre; });
   if (!p || !_fpParams) return;
   _fpProductoSel = nombre;
@@ -4052,9 +4256,10 @@ function fpVerDetalle(nombre) {
   var canales = _fpParams.canales.filter(function(c){ return c.activo; });
   var sug = fpPreciosSugeridos(p.costoCalculado, par, _fpParams.canales);
   var cols = canales.map(function(c){ return { titulo: c.canal + ' (sugerido)', d: sug[c.canal] || {} }; });
-  // Precio actual: el mismo precio de carta analizado en cada canal (sin descuentos).
-  if (p.precioVenta > 0) canales.forEach(function(c) {
-    cols.push({ titulo: c.canal + ' a precio actual', d: fpDesglose(p.precioVenta, p.costoCalculado, c, par), actual: true });
+  // Precio vigente de carta de cada canal (incluye cambios sin guardar), para comparar contra el sugerido.
+  canales.forEach(function(c) {
+    var pv = fpPrecioVigente(p, c.canal);
+    if (pv > 0) cols.push({ titulo: c.canal + ' a precio de carta', d: fpDesglose(pv, p.costoCalculado, c, par), actual: true });
   });
   var filas = [
     ['Precio final (con IVA)', 'precioFinal', true],
@@ -4094,12 +4299,13 @@ function fpVerDetalle(nombre) {
   });
   if (!(p.costoCalculado > 0)) avisos.push('El producto no tiene costo de producción: revisá su receta.');
   if (avisos.length) html += '<div style="background:#fff3cd;border:1px solid #f4a21d;border-radius:8px;padding:8px 12px;margin-top:8px;font-size:11px;color:#856404;line-height:1.6">⚠ ' + avisos.join('<br>⚠ ') + '</div>';
-  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">"A precio actual" muestra el precio de carta de hoy (último precio de venta registrado) analizado en cada canal, para comparar contra el sugerido.</div>';
+  html += '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">"A precio de carta" analiza el precio cargado en cada canal (incluidos los cambios todavía sin guardar), para compararlo contra el sugerido.' +
+    (p.precioPromedioVentas > 0 ? ' Promedio de ventas importadas (' + p.mesPromedioVentas + ', incluye envío): ' + fpFmt(p.precioPromedioVentas) + '.' : '') + '</div>';
   document.getElementById('fp-detalle-titulo').textContent = 'Desglose: ' + p.nombre + ' · costo de producción ' + fpFmt(p.costoCalculado);
   document.getElementById('fp-detalle').innerHTML = html;
   var card = document.getElementById('fp-detalle-card');
   card.style.display = '';
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!sinScroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // TOAST
