@@ -978,7 +978,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     <!-- Slider precio de venta -->
     <div style="background:#fff;border:1px solid #e8d9b8;border-radius:10px;padding:16px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <label class="form-label" style="margin:0">Precio de venta simulado</label>
+        <label class="form-label" style="margin:0">Precio de venta simulado <span id="sim-iva-nota" style="font-weight:400;color:#8a7a5a"></span></label>
         <div style="display:flex;gap:8px;align-items:center">
           <span style="font-size:11px;color:#8a7a5a">$</span>
           <input type="number" id="sim-precio-input" class="form-input" style="width:120px;font-weight:700;font-size:15px" min="0" step="100" oninput="simActualizar()">
@@ -988,6 +988,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
       <div style="display:flex;justify-content:space-between;font-size:10px;color:#8a7a5a;margin-top:4px">
         <span>$ 0</span><span id="sim-slider-max">$ 50.000</span>
       </div>
+      <div id="sim-neto" style="font-size:11px;color:#8a7a5a;margin-top:6px"></div>
     </div>
     <!-- KPIs resultado -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
@@ -2370,8 +2371,8 @@ function prodRenderListado(lista) {
     html += '<div style="font-size:11px;font-weight:700;color:var(--verde);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 8px;padding-bottom:6px;border-bottom:2px solid #e8d9b8">'+rubro+'</div>';
     html += '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+
       '<th>Producto</th><th style="text-align:right">Costo</th><th style="text-align:right">Precio venta</th>'+
-      '<th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th>'+
-      '<th style="text-align:right">Incidencia costo %</th><th style="text-align:center">Semáforo</th>'+
+      '<th style="text-align:right" title="Precio neto de IVA menos costo de producción">Margen $</th><th style="text-align:right" title="Sobre el precio neto de IVA">Margen %</th>'+
+      '<th style="text-align:right" title="Costo de producción sobre el precio neto de IVA">Incidencia costo %</th><th style="text-align:center">Semáforo</th>'+
       '<th style="text-align:center">Carta</th><th style="width:60px"></th></tr></thead><tbody>';
 
     grupos[rubro].forEach(function(p) {
@@ -2989,7 +2990,7 @@ function amRender(lista, modoVentas) {
   html += '</tbody></table></div></div>';
 
   var nota = '<div style="background:#fdf8f0;border:1px solid #e8d9b8;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:11px;color:#8a7a5a">'+
-    'ℹ️ Los costos se calculan con el precio de la <strong>última compra registrada</strong>. El precio de venta es el <strong>precio de carta del canal principal</strong> (Costos y precios de venta); si un producto no lo tiene, se usa el promedio de ventas importadas. Las unidades vendidas corresponden al mes seleccionado.'+
+    'ℹ️ Los costos se calculan con el precio de la <strong>última compra registrada</strong>. El precio de venta es el <strong>precio de carta del canal principal</strong> (Costos y precios de venta); si un producto no lo tiene, se usa el promedio de ventas importadas. Márgenes e incidencia del costo se calculan sobre el precio neto de IVA (desde el inicio de la facturación). Las unidades vendidas corresponden al mes seleccionado.'+
   '</div>';
 
   cont.innerHTML = kpis + html + nota;
@@ -3048,7 +3049,10 @@ function simCargarProducto() {
   document.getElementById('sim-precio-input').value  = precioActual;
   document.getElementById('sim-target-pct').textContent = prod.foodCostTarget || 30;
 
-  var sugerido = prod.foodCostTarget > 0 ? Math.round(prod.costoCalculado / (prod.foodCostTarget / 100)) : 0;
+  // Sugerido: precio final con el IVA vigente, para que el costo sea el % objetivo del neto.
+  var ivaSim = (prod.ivaVigentePct || 0) / 100;
+  var sugerido = prod.foodCostTarget > 0 ? Math.round(prod.costoCalculado / (prod.foodCostTarget / 100) * (1 + ivaSim)) : 0;
+  document.getElementById('sim-iva-nota').textContent = ivaSim > 0 ? '(final con IVA ' + prod.ivaVigentePct + '%)' : '';
   document.getElementById('sim-precio-sugerido').textContent = fmt(sugerido);
 
   document.getElementById('sim-panel').style.display = 'block';
@@ -3068,9 +3072,14 @@ function simActualizar() {
 
   var costo  = _simProducto.costoCalculado || 0;
   var target = _simProducto.foodCostTarget || 30;
-  var margen$ = precio - costo;
-  var margenPct = precio > 0 ? (margen$ / precio) * 100 : 0;
-  var fc        = precio > 0 ? (costo / precio) * 100 : 0;
+  // El precio simulado es final (con el IVA vigente); márgenes y costo % se miden sobre el neto.
+  var ivaSim = (_simProducto.ivaVigentePct || 0) / 100;
+  var neto   = precio / (1 + ivaSim);
+  document.getElementById('sim-neto').textContent = ivaSim > 0 && precio > 0
+    ? 'Neto de IVA: $ ' + Math.round(neto).toLocaleString('es-AR') + ' · márgenes calculados sobre el neto' : '';
+  var margen$ = neto - costo;
+  var margenPct = neto > 0 ? (margen$ / neto) * 100 : 0;
+  var fc        = neto > 0 ? (costo / neto) * 100 : 0;
   var cm        = margen$; // contribución marginal = precio - costo variable
 
   var fmt = function(n){ return '$ ' + Math.round(n||0).toLocaleString('es-AR'); };
@@ -3173,7 +3182,7 @@ function amExportarHTML() {
     '<div class="card"><div class="card-title">Productos por contribución marginal</div>'+
       '<table><thead><tr><th>#</th><th>Producto</th><th>Rubro</th><th style="text-align:right">Precio venta</th><th style="text-align:right">Costo</th><th style="text-align:right">Margen $</th><th style="text-align:right">Margen %</th><th style="text-align:right">Incidencia costo %</th><th style="min-width:190px">Barra</th></tr></thead>'+
       '<tbody>'+filas+'</tbody></table></div>'+
-    '<div class="nota">ℹ️ Costos calculados con precio de última compra de cada insumo. Precio de venta = precio de carta del canal principal; si no está cargado, promedio de ventas importadas (incluye envío).</div>'+
+    '<div class="nota">ℹ️ Costos calculados con precio de última compra de cada insumo. Precio de venta = precio de carta del canal principal (final); si no está cargado, promedio de ventas importadas (incluye envío). Márgenes e incidencia del costo calculados sobre el precio neto de IVA.</div>'+
     '<div class="footer">Papá Andrés · Análisis Marginal · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
     '</div></body></html>';
 

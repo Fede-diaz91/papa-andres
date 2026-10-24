@@ -1090,7 +1090,16 @@ function getProductos(fechaCorte) {
   var calcularCosto = modelo.calcularCosto, enriquecerIngredientes = modelo.enriquecerIngredientes;
   var preciosVenta  = getPreciosUltimaVenta();
   var preciosCarta  = getPreciosCarta();
-  var canalPrincipal = _pvCanalPrincipal(getParametrosVenta().canales);
+  var pv = getParametrosVenta();
+  var canalPrincipal = _pvCanalPrincipal(pv.canales);
+  // IVA que contiene un precio según el mes al que corresponde: antes del inicio de la facturación, ninguno.
+  var hoy = new Date();
+  var ivaVigente = _tasasFiscales(pv.parametros, hoy.getFullYear(), hoy.getMonth() + 1).iva;
+  var MESES_N = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  var ivaDeVenta = function(ref) {
+    var m = MESES_N.indexOf(String(ref.mes || '').toLowerCase());
+    return m < 0 ? ivaVigente : _tasasFiscales(pv.parametros, ref.anio, m + 1).iva;
+  };
 
   var dataP = sheetP.getDataRange().getValues();
   var headersP = dataP[0];
@@ -1112,27 +1121,33 @@ function getProductos(fechaCorte) {
     var ventaRef    = preciosVenta[nombre];
     var carta       = preciosCarta[nombre] || {};
     var precioCarta = canalPrincipal && carta[canalPrincipal] ? carta[canalPrincipal].precio : 0;
-    var precioVenta, fuentePrecio;
-    if (precioCarta > 0)      { precioVenta = precioCarta;    fuentePrecio = 'carta'; }
-    else if (ventaRef)        { precioVenta = ventaRef.precio; fuentePrecio = 'ventas/' + ventaRef.mes; }
-    else                      { precioVenta = precioVentaSheet; fuentePrecio = 'manual'; }
+    var precioVenta, fuentePrecio, iva;
+    if (precioCarta > 0)      { precioVenta = precioCarta;    fuentePrecio = 'carta';  iva = ivaVigente; }
+    else if (ventaRef)        { precioVenta = ventaRef.precio; fuentePrecio = 'ventas/' + ventaRef.mes; iva = ivaDeVenta(ventaRef); }
+    else                      { precioVenta = precioVentaSheet; fuentePrecio = 'manual'; iva = ivaVigente; }
+    // Márgenes y costo % siempre sobre el precio neto de IVA (hasta el inicio de la facturación, neto = final).
+    var precioNeto = precioVenta / (1 + iva);
     var preciosCanal = {};
     Object.keys(carta).forEach(function(c) { preciosCanal[c] = carta[c].precio; });
     var costoCalculado = calcularCosto(nombre, {});
-    var foodCostReal = precioVenta > 0 ? (costoCalculado / precioVenta) * 100 : 0;
-    var margen       = precioVenta > 0 ? precioVenta - costoCalculado : 0;
-    var margenPct    = precioVenta > 0 ? ((precioVenta - costoCalculado) / precioVenta) * 100 : 0;
+    var foodCostReal = precioNeto > 0 ? (costoCalculado / precioNeto) * 100 : 0;
+    var margen       = precioNeto > 0 ? precioNeto - costoCalculado : 0;
+    var margenPct    = precioNeto > 0 ? ((precioNeto - costoCalculado) / precioNeto) * 100 : 0;
 
     return {
       _rowIndex: idx + 2,
       nombre: nombre, rubro: rubro, enCarta: enCarta,
       precioVenta: precioVenta, precioVentaSheet: precioVentaSheet,
+      precioNeto: Math.round(precioNeto),
+      ivaPct: Math.round(iva * 10000) / 100,            // IVA contenido en precioVenta
+      ivaVigentePct: Math.round(ivaVigente * 10000) / 100, // IVA de los precios de hoy
       costoCalculado: Math.round(costoCalculado * 10) / 10,
       foodCostReal: Math.round(foodCostReal * 10) / 10,
       foodCostTarget: foodCostTarget,
       margen: Math.round(margen),
       margenPct: Math.round(margenPct * 10) / 10,
-      precioSugerido: foodCostTarget > 0 ? Math.round(costoCalculado / (foodCostTarget/100)) : 0,
+      // Precio final (con IVA vigente) para que el costo de producción sea el % objetivo del neto.
+      precioSugerido: foodCostTarget > 0 ? Math.round(costoCalculado / (foodCostTarget/100) * (1 + ivaVigente)) : 0,
       fuentePrecio: fuentePrecio,
       canalPrincipal: canalPrincipal,
       preciosCanal: preciosCanal,
