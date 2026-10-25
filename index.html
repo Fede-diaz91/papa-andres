@@ -375,6 +375,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
               <button class="nat-sel-btn variable" onclick="gSetNat('variable',this)">🟡 Costo Variable<br><span style="font-size:10px;font-weight:400">Varía con las ventas</span></button>
             </div>
           </div>
+          <div id="g-edit-banner" style="display:none;background:#fff3cd;border:1px solid #f4a21d;border-radius:8px;padding:10px 14px;font-size:12px;color:#856404;margin-bottom:12px;line-height:1.8"></div>
           <div class="card-title" style="margin-top:4px">Datos generales</div>
           <div class="form-grid-2" style="margin-bottom:14px">
             <div><label class="form-label">Fecha *</label><input type="date" id="g-fecha" class="form-input"></div>
@@ -384,7 +385,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <div class="card-title">Datos del comprobante</div>
             <div class="form-grid-2" style="margin-bottom:10px">
               <div><label class="form-label">N° Comprobante</label><input type="text" id="g-comprobante" class="form-input" placeholder="Factura / remito"></div>
-              <div><label class="form-label">IVA %</label><select id="g-iva" class="form-input" onchange="gCalcMontos()"><option value="0">0% (exento)</option><option value="10.5">10,5%</option><option value="21" selected>21%</option><option value="27">27%</option></select></div>
+              <div><label class="form-label">IVA %</label><select id="g-iva" class="form-input" onchange="document.getElementById('g-iva-monto').dataset.manual='0';gCalcMontos()"><option value="0">0% (exento)</option><option value="10.5">10,5%</option><option value="21" selected>21%</option><option value="27">27%</option></select></div>
             </div>
             <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
               <span>Ítems de la compra</span>
@@ -394,7 +395,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <div class="card-title">Totales del comprobante</div>
             <div class="form-grid-3" style="background:#fdf8f0;border:1px solid #e8d9b8;border-radius:10px;padding:14px;margin-bottom:10px">
               <div><label class="form-label">Subtotal s/IVA $</label><input type="number" id="g-subtotal" class="form-input" readonly placeholder="0,00" style="background:#f5f0e8"></div>
-              <div><label class="form-label">IVA $ <span style="font-size:10px;color:#8a7a5a;font-weight:400">(editable)</span></label><input type="number" id="g-iva-monto" class="form-input" placeholder="0,00" oninput="gCalcTotal()"></div>
+              <div><label class="form-label">IVA $ <span style="font-size:10px;color:#8a7a5a;font-weight:400">(editable)</span></label><input type="number" id="g-iva-monto" class="form-input" placeholder="0,00" oninput="this.dataset.manual='1';gCalcTotal()"></div>
               <div><label class="form-label">Percepción IVA $</label><input type="number" id="g-perc-iva" class="form-input" min="0" step="0.01" placeholder="0,00" oninput="gCalcTotal()"></div>
               <div><label class="form-label">Percepción IIBB $</label><input type="number" id="g-perc-iibb" class="form-input" min="0" step="0.01" placeholder="0,00" oninput="gCalcTotal()"></div>
               <div><label class="form-label">Percepción Ganancias $</label><input type="number" id="g-perc-gan" class="form-input" min="0" step="0.01" placeholder="0,00" oninput="gCalcTotal()"></div>
@@ -446,7 +447,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
           </div>
           <div style="margin-top:12px"><label class="form-label">Notas</label><textarea id="g-notas" class="form-input" rows="2" style="resize:vertical"></textarea></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
-            <button class="btn btn-primary" onclick="gGuardar()">Guardar</button>
+            <button class="btn btn-primary" id="g-btn-guardar" onclick="gGuardar()">Guardar</button>
             <button id="g-btn-nuevo-insumo" class="btn btn-secondary btn-sm" onclick="gTogglePanel('g-panel-insumo')">+ Nuevo insumo</button>
             <button class="btn btn-secondary btn-sm" onclick="gTogglePanel('g-panel-prov')">+ Nuevo proveedor</button>
           </div>
@@ -2048,7 +2049,7 @@ function gGetItemsCompra(){
     var cant   = parseFloat(document.getElementById('ic-cant-'+i).value)||0;
     var pu     = parseFloat(document.getElementById('ic-pu-'+i).value)||0;
     if (!insumo || cant <= 0 || pu <= 0) continue;
-    items.push({insumo:insumo, unidad:unidad, cantidad:cant, precioUnit:pu, subtotal:cant*pu});
+    items.push({insumo:insumo, unidad:unidad, cantidad:cant, precioUnit:pu, subtotal:cant*pu, notas:row.dataset.notas||''});
   }
   return items;
 }
@@ -2103,10 +2104,24 @@ function gGuardar(){var fecha=document.getElementById('g-fecha').value,notas=doc
       montoTotal:Math.round(totalPagar*proporcion*100)/100,
       percepcionIVA:Math.round(percIVA*proporcion*100)/100,
       percepcionIIBB:Math.round(percIIBB*proporcion*100)/100,
-      percepcionGanancias:Math.round(percGan*proporcion*100)/100
+      percepcionGanancias:Math.round(percGan*proporcion*100)/100,
+      notas:it.notas||''
     };
   });
-  apiPost('registrarCompraFactura',{fecha:fecha, proveedor:prov, comprobante:comprobante, iva:ivaPct, notas:notas, items:lineas}).then(function(r){
+  var payload={fecha:fecha, proveedor:prov, comprobante:comprobante, iva:ivaPct, notas:notas, items:lineas};
+  if(_gEditando){
+    payload.original=_gEditando;
+    toast('Guardando cambios...');
+    apiPost('editarCompraFactura',payload).then(function(r){
+      if(r&&r.ok){toast('Comprobante actualizado ✓');_gEditando=null;gMostrarModoEdicion(null);gLimpiarForm();
+        var bh=[].filter.call(document.querySelectorAll('#panel-gastos .gtab'),function(b){return b.getAttribute('onclick').indexOf("'historial'")>=0;})[0];
+        if(bh&&_gHistorialCache){gTab('historial',bh);gCargarHistorial();}}
+      else if(r&&r.duplicado) toast('⚠ Comprobante duplicado: ya existe otra compra con ese número para ese proveedor.',false);
+      else toast('Error al guardar: '+((r&&(r.msg||r.error))||''),false);
+    }).catch(function(e){toast('Error: '+e.message,false);});
+    return;
+  }
+  apiPost('registrarCompraFactura',payload).then(function(r){
     if(r&&r.ok){toast(items.length===1?'Compra guardada ✓':''+items.length+' ítems guardados ✓');gLimpiarForm();}
     else if(r&&r.duplicado) toast('⚠ Comprobante duplicado: ya existe una compra con ese número.',false);
     else toast('Error al guardar la compra: '+((r&&(r.msg||r.error))||''),false);
@@ -2124,9 +2139,201 @@ function gSaveProveedor(nId,cId,tId,cuId,panelId){var nombre=document.getElement
 
 var _gHistorialCache = null, _gHistorialTipo = null;
 function gCargarHistorial(){var tipo=document.getElementById('h-tipo').value,mes=document.getElementById('h-mes').value,anio=document.getElementById('h-anio').value,cont=document.getElementById('g-tabla-historial'),cfg=gTablaConfig[tipo];_gHistorialCache=null;_gHistorialTipo=tipo;cont.innerHTML='<div class="loading">Cargando...</div>';apiGet(cfg.action,{mes:mes,anio:anio}).then(function(rows){_gHistorialCache=rows||[];gFiltrarTablaLocal();}).catch(function(){cont.innerHTML='<div class="loading">Error al cargar.</div>';});}
-function gFiltrarTablaLocal(){if(!_gHistorialCache)return;var busqConc=(document.getElementById('h-buscar-concepto').value||'').toLowerCase().trim(),busqProv=(document.getElementById('h-buscar-prov').value||'').toLowerCase().trim();var filtradas=_gHistorialCache.filter(function(r){var hayConc=!busqConc||Object.values(r).some(function(v){return String(v||'').toLowerCase().includes(busqConc);});var hayProv=!busqProv||String(r['Proveedor']||'').toLowerCase().includes(busqProv);return hayConc&&hayProv;});gRenderTabla(document.getElementById('g-tabla-historial'),filtradas,gTablaConfig[_gHistorialTipo].cols,_gHistorialTipo);}
+function gFiltrarTablaLocal(){if(!_gHistorialCache)return;var busqConc=(document.getElementById('h-buscar-concepto').value||'').toLowerCase().trim(),busqProv=(document.getElementById('h-buscar-prov').value||'').toLowerCase().trim();var filtradas=_gHistorialCache.filter(function(r){var hayConc=!busqConc||Object.values(r).some(function(v){return String(v||'').toLowerCase().includes(busqConc);});var hayProv=!busqProv||String(r['Proveedor']||'').toLowerCase().includes(busqProv);return hayConc&&hayProv;});if(_gHistorialTipo==='compras'){gRenderCompras(document.getElementById('g-tabla-historial'),busqConc,busqProv);return;}gRenderTabla(document.getElementById('g-tabla-historial'),filtradas,gTablaConfig[_gHistorialTipo].cols,_gHistorialTipo);}
 function gRenderTabla(cont,rows,cols,tipo){if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cfg=gTablaConfig[tipo]||{};var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=r[c]!=null?r[c]:'-';if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="gEliminarRegistro(\''+cfg.deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div><div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
 function gEliminarRegistro(deleteAction,rowIndex,idx){if(!confirm('¿Eliminar este registro?'))return;apiPost(deleteAction,{rowIndex:rowIndex}).then(function(r){if(r.ok){toast('Eliminado ✓');gCargarHistorial();}else toast('Error al eliminar: '+(r.msg||''),false);});}
+
+// ============================================================
+// HISTORIAL DE COMPRAS POR COMPROBANTE + EDICIÓN
+// Un comprobante = filas con la misma fecha, proveedor y número.
+// ============================================================
+var _gEditando = null;      // { filas, fecha, proveedor, comprobante } mientras se edita un comprobante
+var _gComprasGrupos = {};   // clave -> grupo, del último render
+var _gComprasAbiertos = {}; // clave -> true si el detalle está desplegado
+
+function gCmpNorm(v) { return String(v == null ? '' : v).trim().toUpperCase(); }
+function gCmpClave(r) { return r.Fecha + '|' + gCmpNorm(r.Proveedor) + '|' + gCmpNorm(r.Comprobante); }
+function gCmpFechaOrden(f) { var m = String(f || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? (+m[3]) * 10000 + (+m[2]) * 100 + (+m[1]) : 0; }
+
+function gAgruparCompras(rows) {
+  var grupos = {}, orden = [];
+  (rows || []).forEach(function(r) {
+    var k = gCmpClave(r);
+    if (!grupos[k]) {
+      grupos[k] = { clave: k, fecha: r.Fecha, proveedor: r.Proveedor || '', comprobante: r.Comprobante || '', items: [],
+                    subtotal: 0, iva: 0, percepciones: 0, total: 0, primeraFila: r._rowIndex || 0 };
+      orden.push(grupos[k]);
+    }
+    var g = grupos[k];
+    g.items.push(r);
+    g.subtotal += parseFloat(r.Subtotal) || 0;
+    g.iva += parseFloat(r.IVAMonto) || 0;
+    g.percepciones += (parseFloat(r.PercepcionIVA) || 0) + (parseFloat(r.PercepcionIIBB) || 0) + (parseFloat(r.PercepcionGanancias) || 0);
+    g.total += parseFloat(r.MontoTotal) || 0;
+  });
+  // Más recientes primero; a igual fecha, el último cargado primero.
+  orden.sort(function(a, b) { return (gCmpFechaOrden(b.fecha) - gCmpFechaOrden(a.fecha)) || (b.primeraFila - a.primeraFila); });
+  return orden;
+}
+
+function gRenderCompras(cont, busqConc, busqProv) {
+  var grupos = gAgruparCompras(_gHistorialCache).filter(function(g) {
+    var okProv = !busqProv || String(g.proveedor).toLowerCase().indexOf(busqProv) >= 0;
+    var okConc = !busqConc || String(g.comprobante).toLowerCase().indexOf(busqConc) >= 0 ||
+      g.items.some(function(r) { return Object.keys(r).some(function(c) { return c !== '_rowIndex' && String(r[c] == null ? '' : r[c]).toLowerCase().indexOf(busqConc) >= 0; }); });
+    return okProv && okConc;
+  });
+  _gComprasGrupos = {};
+  grupos.forEach(function(g) { _gComprasGrupos[g.clave] = g; });
+  if (!grupos.length) { cont.innerHTML = '<div class="loading">Sin compras para el período.</div>'; return; }
+  var f2 = function(n) { return (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var esc = function(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
+  var tot = { sub: 0, iva: 0, perc: 0, total: 0, items: 0 };
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th style="width:28px"></th><th>Fecha</th><th>Proveedor</th><th>Comprobante</th>' +
+    '<th style="text-align:right">Ítems</th><th style="text-align:right">Subtotal</th><th style="text-align:right">IVA</th><th style="text-align:right">Percepciones</th>' +
+    '<th style="text-align:right">Total</th><th style="width:96px"></th></tr></thead><tbody>';
+  grupos.forEach(function(g, i) {
+    tot.sub += g.subtotal; tot.iva += g.iva; tot.perc += g.percepciones; tot.total += g.total; tot.items += g.items.length;
+    var abierto = !!_gComprasAbiertos[g.clave];
+    html += '<tr style="cursor:pointer" onclick="gToggleComprobante(' + i + ')" data-cmp="' + i + '">' +
+      '<td style="text-align:center;color:var(--oliva)" id="g-cmp-flecha-' + i + '">' + (abierto ? '▾' : '▸') + '</td>' +
+      '<td>' + esc(g.fecha) + '</td><td>' + (esc(g.proveedor) || '<span style="color:#8a7a5a">Sin proveedor</span>') + '</td>' +
+      '<td>' + (esc(g.comprobante) || '<span style="color:#8a7a5a">—</span>') + '</td>' +
+      '<td class="num">' + g.items.length + '</td><td class="num">' + f2(g.subtotal) + '</td><td class="num">' + f2(g.iva) + '</td>' +
+      '<td class="num">' + f2(g.percepciones) + '</td><td class="num" style="font-weight:600">' + f2(g.total) + '</td>' +
+      '<td style="white-space:nowrap" onclick="event.stopPropagation()">' +
+        '<button onclick="gEditarComprobante(' + i + ')" style="background:#f2f7e8;border:none;border-radius:5px;color:var(--verde);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1;margin-right:4px" title="Editar comprobante">✏</button>' +
+        '<button onclick="gEliminarComprobante(' + i + ')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar comprobante completo">🗑</button>' +
+      '</td></tr>';
+    html += '<tr id="g-cmp-det-' + i + '" style="display:' + (abierto ? '' : 'none') + '"><td></td><td colspan="9" style="background:#fdf8f0;padding:8px 10px">' +
+      '<table class="g-tabla" style="font-size:11px;margin:0"><thead><tr><th>Insumo</th><th>Unidad</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit. s/IVA</th><th style="text-align:right">Subtotal</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th><th>Notas</th></tr></thead><tbody>' +
+      g.items.map(function(r) {
+        return '<tr><td>' + esc(r.Insumo) + '</td><td>' + esc(r.Unidad) + '</td><td class="num">' + (parseFloat(r.Cantidad) || 0).toLocaleString('es-AR', { maximumFractionDigits: 3 }) + '</td>' +
+          '<td class="num">' + f2(r.PrecioUnit) + '</td><td class="num">' + f2(r.Subtotal) + '</td><td class="num">' + f2(r.IVAMonto) + '</td><td class="num">' + f2(r.MontoTotal) + '</td>' +
+          '<td style="color:#8a7a5a;max-width:260px">' + esc(r.Notas) + '</td></tr>';
+      }).join('') + '</tbody></table></td></tr>';
+  });
+  html += '</tbody><tfoot><tr style="font-weight:700"><td></td><td colspan="3">Total del período</td><td class="num">' + tot.items + '</td><td class="num">' + f2(tot.sub) + '</td><td class="num">' + f2(tot.iva) + '</td>' +
+    '<td class="num">' + f2(tot.perc) + '</td><td class="num">' + f2(tot.total) + '</td><td></td></tr></tfoot></table></div>' +
+    '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">' + grupos.length + ' comprobante' + (grupos.length !== 1 ? 's' : '') + ' · ' + tot.items + ' ítem' + (tot.items !== 1 ? 's' : '') +
+    '. Tocá un comprobante para ver sus ítems. El Excel se descarga con el detalle por ítem.</div>';
+  cont.innerHTML = html;
+  _gComprasIndice = grupos;
+}
+var _gComprasIndice = [];
+
+function gToggleComprobante(i) {
+  var g = _gComprasIndice[i]; if (!g) return;
+  var det = document.getElementById('g-cmp-det-' + i), fl = document.getElementById('g-cmp-flecha-' + i);
+  var abrir = det.style.display === 'none';
+  det.style.display = abrir ? '' : 'none';
+  fl.textContent = abrir ? '▾' : '▸';
+  if (abrir) _gComprasAbiertos[g.clave] = true; else delete _gComprasAbiertos[g.clave];
+}
+
+function gCmpOriginal(g) {
+  return { filas: g.items.map(function(r) { return r._rowIndex; }), fecha: g.fecha, proveedor: g.proveedor, comprobante: g.comprobante };
+}
+
+function gEliminarComprobante(i) {
+  var g = _gComprasIndice[i]; if (!g) return;
+  var desc = (g.comprobante || 'sin número') + ' de ' + (g.proveedor || 'sin proveedor') + ' del ' + g.fecha;
+  if (!confirm('¿Eliminar el comprobante ' + desc + ' completo (' + g.items.length + ' ítem' + (g.items.length !== 1 ? 's' : '') + ')?')) return;
+  toast('Eliminando...');
+  apiPost('eliminarCompraFactura', { original: gCmpOriginal(g) }).then(function(r) {
+    if (r && r.ok) { toast('Comprobante eliminado ✓'); delete _gComprasAbiertos[g.clave]; gCargarHistorial(); }
+    else toast('Error: ' + ((r && (r.msg || r.error)) || ''), false);
+  }).catch(function(e) { toast('Error: ' + e.message, false); });
+}
+
+function gSelectAsegurar(sel, valor, texto) {
+  valor = String(valor == null ? '' : valor);
+  if (![].some.call(sel.options, function(o) { return o.value === valor; })) sel.appendChild(new Option(texto || valor, valor));
+  sel.value = valor;
+}
+
+function gEditarComprobante(i) {
+  var g = _gComprasIndice[i]; if (!g) return;
+  if (_gEditando && !confirm('Ya estás editando otro comprobante. ¿Descartar esos cambios?')) return;
+  // Ir a Registrar → Compra
+  var btnReg = [].filter.call(document.querySelectorAll('#panel-gastos .gtab'), function(b) { return b.getAttribute('onclick').indexOf("'registrar'") >= 0; })[0];
+  if (btnReg) gTab('registrar', btnReg);
+  var btnCompra = [].filter.call(document.querySelectorAll('.tipo-btn'), function(b) { return b.getAttribute('onclick').indexOf("'compra'") >= 0; })[0];
+  if (btnCompra) gSetTipo('compra', btnCompra);
+  _gEditando = null;
+  gLimpiarForm();
+  setTimeout(function() { gCargarComprobanteEnForm(g); }, 80); // gLimpiarForm agrega un ítem vacío con 50 ms de demora
+}
+
+function gCargarComprobanteEnForm(g) {
+  var cont = document.getElementById('g-items-compra'); if (cont) cont.innerHTML = '';
+  var tot = document.getElementById('ic-total-row'); if (tot) tot.remove();
+  _gCompraItems = 0;
+  var m = String(g.fecha).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  document.getElementById('g-fecha').value = m ? m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2) : '';
+  gSelectAsegurar(document.getElementById('g-proveedor'), g.proveedor, g.proveedor || 'Sin proveedor');
+  document.getElementById('g-comprobante').value = g.comprobante || '';
+  var ivaPct = parseFloat(g.items[0]['IVA%']) || 0;
+  gSelectAsegurar(document.getElementById('g-iva'), String(ivaPct), String(ivaPct).replace('.', ',') + '%');
+  // Notas: si todas las líneas tienen la misma, va al campo general; si no, cada línea conserva la suya.
+  var notas = g.items.map(function(r) { return String(r.Notas || ''); });
+  var notaComun = notas.every(function(n) { return n === notas[0]; }) ? notas[0] : '';
+  document.getElementById('g-notas').value = notaComun;
+  g.items.forEach(function(r) {
+    gAgregarItemCompra();
+    var id = _gCompraItems;
+    var selIns = document.getElementById('ic-ins-' + id);
+    var insumo = String(r.Insumo || '').trim().toUpperCase();
+    if ([].some.call(selIns.options, function(o) { return o.value === insumo && insumo !== 'OTROS'; })) selIns.value = insumo;
+    else { selIns.value = 'OTROS'; var txt = document.getElementById('ic-ins-txt-' + id); txt.style.display = 'block'; txt.value = insumo; }
+    gSelectAsegurar(document.getElementById('ic-um-sel-' + id), r.Unidad || '', r.Unidad || 'UM');
+    document.getElementById('ic-cant-' + id).value = parseFloat(r.Cantidad) || 0;
+    document.getElementById('ic-pu-' + id).value = parseFloat(r.PrecioUnit) || 0;
+    var fila = document.getElementById('ic-row-' + id);
+    if (!notaComun && r.Notas) { fila.dataset.notas = String(r.Notas); fila.title = 'Nota de la línea: ' + r.Notas; }
+    gCalcItemCompra(id);
+  });
+  var suma = function(c) { return Math.round(g.items.reduce(function(s, r) { return s + (parseFloat(r[c]) || 0); }, 0) * 100) / 100; };
+  var ivaEl = document.getElementById('g-iva-monto');
+  ivaEl.value = suma('IVAMonto').toFixed(2);
+  // Si el IVA grabado es el calculado (subtotal × %), se recalcula al tocar los ítems;
+  // si se había ajustado a mano, se respeta (y se puede volver a editar).
+  var ivaCalc = Math.round(suma('Subtotal') * ivaPct) / 100;
+  ivaEl.dataset.manual = Math.abs(ivaCalc - suma('IVAMonto')) > 0.05 ? '1' : '0';
+  document.getElementById('g-perc-iva').value = suma('PercepcionIVA') || '';
+  document.getElementById('g-perc-iibb').value = suma('PercepcionIIBB') || '';
+  document.getElementById('g-perc-gan').value = suma('PercepcionGanancias') || '';
+  gCalcTotal();
+  _gEditando = gCmpOriginal(g);
+  gMostrarModoEdicion(g);
+  document.getElementById('gtab-registrar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function gMostrarModoEdicion(g) {
+  var banner = document.getElementById('g-edit-banner');
+  var btn = document.getElementById('g-btn-guardar');
+  if (g) {
+    banner.innerHTML = '✏ Editando el comprobante <strong>' + (g.comprobante || 'sin número') + '</strong> de ' + (g.proveedor || 'sin proveedor') + ' del ' + g.fecha +
+      ' (' + g.items.length + ' ítem' + (g.items.length !== 1 ? 's' : '') + '). Al guardar se reemplaza completo.' +
+      ' <button class="btn btn-secondary btn-sm" style="margin-left:8px" onclick="gCancelarEdicion()">Cancelar edición</button>';
+    banner.style.display = '';
+    if (btn) btn.textContent = 'Guardar cambios';
+    document.querySelectorAll('.tipo-btn').forEach(function(b) { b.disabled = b.getAttribute('onclick').indexOf("'compra'") < 0; });
+  } else {
+    banner.style.display = 'none';
+    banner.innerHTML = '';
+    if (btn) btn.textContent = 'Guardar';
+    document.querySelectorAll('.tipo-btn').forEach(function(b) { b.disabled = false; });
+  }
+}
+
+function gCancelarEdicion() {
+  _gEditando = null;
+  gMostrarModoEdicion(null);
+  gLimpiarForm();
+  var btnHist = [].filter.call(document.querySelectorAll('#panel-gastos .gtab'), function(b) { return b.getAttribute('onclick').indexOf("'historial'") >= 0; })[0];
+  if (btnHist && _gHistorialCache) gTab('historial', btnHist);
+}
 
 function gExportarHistorialExcel(){
   var rows=_gHistorialCache;if(!rows||!rows.length){toast('No hay datos para exportar',false);return;}

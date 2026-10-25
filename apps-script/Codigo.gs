@@ -46,7 +46,7 @@ function doGet(e) {
     else if (action === 'insumos')          result = getInsumos();
     else if (action === 'subrecetas')       result = getSubrecetasCompleto();
     else if (action === 'parametrosVenta')  result = getParametrosVenta();
-    else result = { ok: true, msg: 'Papá Andrés API v2.4' };
+    else result = { ok: true, msg: 'Papá Andrés API v2.5' };
 
     return _json(result);
   } catch(err) {
@@ -83,6 +83,8 @@ function doPost(e) {
     else if (action === 'agregarPlataforma')       result = agregarPlataforma(data);
     else if (action === 'eliminarPlataforma')      result = eliminarPlataforma(data.id);
     else if (action === 'eliminarCompra')          result = eliminarCompra(data);
+    else if (action === 'editarCompraFactura')     result = editarCompraFactura(data);
+    else if (action === 'eliminarCompraFactura')   result = eliminarCompraFactura(data);
     else if (action === 'eliminarGastoFijo')       result = eliminarFila('GastosFijos', data.rowIndex);
     else if (action === 'eliminarGastoVariable')   result = eliminarFila('GastosVariables', data.rowIndex);
     else if (action === 'eliminarEnvio')           result = eliminarFila('Envíos', data.rowIndex);
@@ -411,7 +413,8 @@ function eliminarPlataforma(id) {
 
 // ── PUNTO 3: Anti-duplicado de comprobantes ──
 // Verifica si ya existe un comprobante igual del mismo proveedor
-function verificarComprobante(comprobante, proveedor) {
+// excluir: { numeroDeFila: true } — filas del propio comprobante cuando se lo está editando.
+function verificarComprobante(comprobante, proveedor, excluir) {
   if (!comprobante || !comprobante.trim()) return { duplicado: false }; // sin comprobante, no verificar
   var sheet = getSpreadsheet().getSheetByName('Compras');
   if (!sheet || sheet.getLastRow() <= 1) return { duplicado: false };
@@ -424,6 +427,7 @@ function verificarComprobante(comprobante, proveedor) {
   var compNorm = String(comprobante).trim().toUpperCase();
   var provNorm = String(proveedor||'').trim().toUpperCase();
   for (var i = 1; i < data.length; i++) {
+    if (excluir && excluir[i + 1]) continue;
     var existComp = String(data[i][colComp]||'').trim().toUpperCase();
     var existProv = String(data[i][colProv]||'').trim().toUpperCase();
     if (existComp && existComp === compNorm && (!provNorm || existProv === provNorm)) {
@@ -492,6 +496,86 @@ function eliminarFila(sheetName, rowIndex, idVal) {
 }
 
 function eliminarCompra(data) { return eliminarFila('Compras', data.rowIndex); }
+
+// ============================================================
+// EDICIÓN Y BAJA DE UN COMPROBANTE COMPLETO
+// Un comprobante = las filas de Compras con la misma fecha, proveedor y número.
+// original: { filas: [n° de fila], fecha: 'dd/MM/yyyy', proveedor, comprobante }
+// ============================================================
+function _cmpFechaTxt(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'America/Argentina/Buenos_Aires', 'dd/MM/yyyy');
+  var s = String(v || '').trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : s;
+}
+function _cmpNorm(v) { return String(v || '').trim().toUpperCase(); }
+
+// Verifica que las filas indicadas sigan siendo exactamente ese comprobante (nadie lo cambió en el medio).
+function _cmpValidarOriginal(sheet, original) {
+  var filas = ((original && original.filas) || []).map(function(n){ return parseInt(n, 10); })
+    .filter(function(n){ return n >= 2; });
+  if (!filas.length) return { ok: false, msg: 'No se indicaron las filas del comprobante' };
+  var ultima = sheet.getLastRow();
+  var datos = sheet.getRange(1, 1, ultima, 15).getValues();
+  var fecha = _cmpFechaTxt(original.fecha), prov = _cmpNorm(original.proveedor), comp = _cmpNorm(original.comprobante);
+  for (var i = 0; i < filas.length; i++) {
+    var n = filas[i];
+    if (n > ultima) return { ok: false, msg: 'El comprobante cambió desde que lo abriste. Recargá el historial.' };
+    var r = datos[n - 1];
+    if (_cmpFechaTxt(r[0]) !== fecha || _cmpNorm(r[1]) !== prov || _cmpNorm(r[13]) !== comp)
+      return { ok: false, msg: 'El comprobante cambió desde que lo abriste. Recargá el historial.' };
+  }
+  // Tampoco puede haber aparecido otra línea del mismo comprobante que no esté en la lista.
+  var set = {}; filas.forEach(function(n){ set[n] = true; });
+  for (var j = 1; j < datos.length; j++) {
+    var rr = datos[j];
+    if (!set[j + 1] && rr[0] && _cmpFechaTxt(rr[0]) === fecha && _cmpNorm(rr[1]) === prov && _cmpNorm(rr[13]) === comp)
+      return { ok: false, msg: 'El comprobante cambió desde que lo abriste. Recargá el historial.' };
+  }
+  return { ok: true, filas: filas, set: set };
+}
+
+function _cmpBorrarFilas(sheet, filas) {
+  filas.slice().sort(function(a, b){ return b - a; }).forEach(function(n){ sheet.deleteRow(n); });
+}
+
+// data: lo mismo que registrarCompraFactura + original
+function editarCompraFactura(data) {
+  return _vConLock(function() {
+    var sheet = getSpreadsheet().getSheetByName('Compras');
+    if (!sheet) return { ok: false, msg: 'Hoja Compras no encontrada' };
+    var val = _cmpValidarOriginal(sheet, data.original);
+    if (!val.ok) return val;
+    var items = (data.items || []).filter(function(it){ return it && String(it.insumo || '').trim(); });
+    if (!items.length) return { ok: false, msg: 'La factura no tiene ítems' };
+    if (data.comprobante && String(data.comprobante).trim()) {
+      var check = verificarComprobante(data.comprobante, data.proveedor, val.set);
+      if (check.duplicado) return { ok: false, duplicado: true, msg: 'El comprobante "' + data.comprobante + '" ya está registrado para este proveedor.' };
+    }
+    var rows = items.map(function(it) {
+      return [data.fecha, data.proveedor || '', String(it.insumo).trim().toUpperCase(), it.unidad || '',
+        parseFloat(it.cantidad) || 0, parseFloat(it.precioUnit) || 0, parseFloat(it.subtotal) || 0,
+        parseFloat(data.iva) || 0, parseFloat(it.ivaMonto) || 0, parseFloat(it.montoTotal) || 0,
+        parseFloat(it.percepcionIVA) || 0, parseFloat(it.percepcionIIBB) || 0, parseFloat(it.percepcionGanancias) || 0,
+        data.comprobante || '', it.notas || data.notas || ''];
+    });
+    // Primero se agregan las líneas nuevas y después se borran las viejas: si algo falla en el medio, no se pierde la compra.
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    _cmpBorrarFilas(sheet, val.filas);
+    return { ok: true, count: rows.length };
+  });
+}
+
+function eliminarCompraFactura(data) {
+  return _vConLock(function() {
+    var sheet = getSpreadsheet().getSheetByName('Compras');
+    if (!sheet) return { ok: false, msg: 'Hoja Compras no encontrada' };
+    var val = _cmpValidarOriginal(sheet, data.original);
+    if (!val.ok) return val;
+    _cmpBorrarFilas(sheet, val.filas);
+    return { ok: true, count: val.filas.length };
+  });
+}
 
 function registrarGastoFijo(data) {
   getSpreadsheet().getSheetByName('GastosFijos')
