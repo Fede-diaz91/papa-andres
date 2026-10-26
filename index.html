@@ -247,7 +247,12 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
   .g-tabla td,.g-tabla th{padding:8px}
   .no-movil{display:none}
   .solo-movil{display:block}
-  .celda-prov{white-space:normal!important;min-width:120px}
+  .celda-prov{white-space:normal!important;min-width:110px}
+  .celda-acc{width:40px}
+  .celda-acc button{display:block;margin:0 0 6px 0!important;padding:6px 9px!important}
+  #g-tabla-historial .g-tabla td,#g-tabla-historial .g-tabla th{padding:7px 4px;font-size:11px}
+  #g-tabla-historial td[colspan]{padding:6px 2px!important}
+  #g-tabla-historial .g-tabla .g-tabla td,#g-tabla-historial .g-tabla .g-tabla th{padding:6px 4px}
 }
 </style>
 </head>
@@ -2304,16 +2309,17 @@ function gRenderCompras(cont, busqConc, busqProv) {
       '<td class="no-movil">' + (esc(g.comprobante) || '<span style="color:#8a7a5a">—</span>') + '</td>' +
       '<td class="num no-movil">' + g.items.length + '</td><td class="num no-movil">' + f2(g.subtotal) + '</td><td class="num no-movil">' + f2(g.iva) + '</td>' +
       '<td class="num no-movil">' + f2(g.percepciones) + '</td><td class="num" style="font-weight:600">' + f2(g.total) + '</td>' +
-      '<td style="white-space:nowrap" onclick="event.stopPropagation()">' +
+      '<td class="celda-acc" style="white-space:nowrap" onclick="event.stopPropagation()">' +
         '<button onclick="gEditarComprobante(' + i + ')" style="background:#f2f7e8;border:none;border-radius:5px;color:var(--verde);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1;margin-right:4px" title="Editar comprobante">✏</button>' +
         '<button onclick="gEliminarComprobante(' + i + ')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar comprobante completo">🗑</button>' +
       '</td></tr>';
     html += '<tr id="g-cmp-det-' + i + '" style="display:' + (abierto ? '' : 'none') + '"><td class="no-movil"></td><td colspan="9" style="background:#fdf8f0;padding:8px 10px">' +
-      '<table class="g-tabla" style="font-size:11px;margin:0"><thead><tr><th>Insumo</th><th>Unidad</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit. s/IVA</th><th style="text-align:right">Subtotal</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th><th>Notas</th></tr></thead><tbody>' +
+      '<table class="g-tabla" style="font-size:11px;margin:0"><thead><tr><th>Insumo</th><th class="no-movil">Unidad</th><th style="text-align:right">Cantidad</th><th class="no-movil" style="text-align:right">Precio unit. s/IVA</th><th class="no-movil" style="text-align:right">Subtotal</th><th class="no-movil" style="text-align:right">IVA</th><th style="text-align:right">Total</th><th class="no-movil">Notas</th></tr></thead><tbody>' +
       g.items.map(function(r) {
-        return '<tr><td>' + esc(r.Insumo) + '</td><td>' + esc(r.Unidad) + '</td><td class="num">' + (parseFloat(r.Cantidad) || 0).toLocaleString('es-AR', { maximumFractionDigits: 3 }) + '</td>' +
-          '<td class="num">' + f2(r.PrecioUnit) + '</td><td class="num">' + f2(r.Subtotal) + '</td><td class="num">' + f2(r.IVAMonto) + '</td><td class="num">' + f2(r.MontoTotal) + '</td>' +
-          '<td style="color:#8a7a5a;max-width:260px">' + esc(r.Notas) + '</td></tr>';
+        return '<tr><td class="celda-prov">' + esc(r.Insumo) + '</td><td class="no-movil">' + esc(r.Unidad) + '</td><td class="num">' + (parseFloat(r.Cantidad) || 0).toLocaleString('es-AR', { maximumFractionDigits: 3 }) +
+          '<span class="solo-movil" style="font-size:10px;color:#8a7a5a;font-weight:400">' + esc(r.Unidad) + ' × ' + f2(r.PrecioUnit) + '</span></td>' +
+          '<td class="num no-movil">' + f2(r.PrecioUnit) + '</td><td class="num no-movil">' + f2(r.Subtotal) + '</td><td class="num no-movil">' + f2(r.IVAMonto) + '</td><td class="num">' + f2(r.MontoTotal) + '</td>' +
+          '<td class="no-movil" style="color:#8a7a5a;max-width:260px">' + esc(r.Notas) + '</td></tr>';
       }).join('') + '</tbody></table></td></tr>';
   });
   html += '</tbody><tfoot><tr style="font-weight:700"><td></td><td colspan="2">Total del período</td><td class="no-movil"></td><td class="num no-movil">' + tot.items + '</td><td class="num no-movil">' + f2(tot.sub) + '</td><td class="num no-movil">' + f2(tot.iva) + '</td>' +
