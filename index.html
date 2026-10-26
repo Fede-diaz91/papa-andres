@@ -203,6 +203,8 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
 .sidebar-backdrop{display:none}
 .bottom-nav{display:none}
 .solo-movil{display:none}
+.solo-movil-td{display:none}
+.g-tabla tr.cc-sel td{background:#f2f7e8}
 @media(max-width:900px){
   :root{--sidebar-w:0px}
   .sidebar{width:270px;transform:translateX(-100%);transition:transform .25s ease;z-index:300;box-shadow:4px 0 24px rgba(0,0,0,.25)}
@@ -247,10 +249,14 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
   .g-tabla td,.g-tabla th{padding:8px}
   .no-movil{display:none}
   .solo-movil{display:block}
+  .solo-movil-td{display:table-cell}
   .celda-prov{white-space:normal!important;min-width:110px}
   .celda-acc{width:40px}
   .celda-acc button{display:block;margin:0 0 6px 0!important;padding:6px 9px!important}
-  #g-tabla-historial .g-tabla td,#g-tabla-historial .g-tabla th{padding:7px 4px;font-size:11px}
+  #g-tabla-historial .g-tabla td,#g-tabla-historial .g-tabla th,#cc-tabla .g-tabla td,#cc-tabla .g-tabla th,#cc-detalle .g-tabla td,#cc-detalle .g-tabla th,#cc-lista-clientes .g-tabla td,#cc-lista-clientes .g-tabla th{padding:7px 4px;font-size:11px}
+  #cc-detalle .g-tabla td button{padding:2px 5px!important}
+  #cc-detalle .celda-prov{min-width:0}
+  #cc-detalle td:last-child,#cc-detalle th:last-child{width:28px!important}
   #g-tabla-historial td[colspan]{padding:6px 2px!important}
   #g-tabla-historial .g-tabla .g-tabla td,#g-tabla-historial .g-tabla .g-tabla th{padding:6px 4px}
 }
@@ -272,6 +278,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     <div class="nav-section-label">Módulos</div>
     <div class="nav-item" onclick="nav('ventas',this)" onmouseenter="precargar('ventas')"><span class="ico">📈</span><span class="label">Ventas</span></div>
     <div class="nav-item" onclick="nav('gastos',this)" onmouseenter="precargar('gastos')"><span class="ico">🧾</span><span class="label">Compras y Gastos</span></div>
+    <div class="nav-item" onclick="nav('ctacte',this)"><span class="ico">📒</span><span class="label">Cuentas corrientes</span></div>
     <div class="nav-item" onclick="nav('salarios',this)" onmouseenter="precargar('salarios')"><span class="ico">👷</span><span class="label">Salarios y Retiros</span></div>
     <div class="nav-item" onclick="nav('productos',this)" onmouseenter="precargar('productos')"><span class="ico">🍕</span><span class="label">Productos y Recetas</span></div>
     <div class="nav-item" onclick="nav('stock',this)"><span class="ico">📦</span><span class="label">Stock</span></div>
@@ -449,6 +456,10 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <div class="form-grid-2" style="margin-bottom:10px">
               <div><label class="form-label">N° Comprobante</label><input type="text" id="g-comprobante" class="form-input" placeholder="Factura / remito"></div>
               <div><label class="form-label">IVA %</label><select id="g-iva" class="form-input" onchange="document.getElementById('g-iva-monto').dataset.manual='0';gCalcMontos()"><option value="0">0% (exento)</option><option value="10.5">10,5%</option><option value="21" selected>21%</option><option value="27">27%</option></select></div>
+            </div>
+            <div style="margin-bottom:12px;background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:10px 14px">
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--verde);cursor:pointer"><input type="checkbox" id="g-aplazo" onchange="gOnAPlazo()"> Compra a plazo (va a la cuenta corriente del proveedor)</label>
+              <div id="g-venc-wrap" style="display:none;margin-top:8px;max-width:240px"><label class="form-label">Vencimiento (opcional)</label><input type="date" id="g-vencimiento" class="form-input"></div>
             </div>
             <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
               <span>Ítems de la compra</span>
@@ -971,6 +982,81 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     </div>
   </div>
 
+  <!-- CUENTAS CORRIENTES -->
+  <div id="panel-ctacte" class="panel">
+    <div style="max-width:1100px;margin:0 auto">
+      <div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="gtab active" data-cctab="CLIENTE" onclick="ccTab('CLIENTE',this)">🧑‍💼 Clientes</button>
+        <button class="gtab" data-cctab="PROVEEDOR" onclick="ccTab('PROVEEDOR',this)">🏭 Proveedores</button>
+        <button class="gtab" data-cctab="registrar" onclick="ccTab('registrar',this)">📝 Registrar movimiento</button>
+        <button class="gtab" data-cctab="clientes" onclick="ccTab('clientes',this)">📇 Clientes mayoristas</button>
+      </div>
+      <div id="cc-vista-saldos">
+        <div class="kpi-grid" id="cc-kpis"></div>
+        <div class="card">
+          <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <span id="cc-titulo-tabla">Saldos</span>
+            <label style="font-size:11px;font-weight:500;text-transform:none;letter-spacing:0;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="cc-con-saldo" checked onchange="ccRenderSaldos()"> Solo con saldo</label>
+          </div>
+          <div style="margin-bottom:10px;max-width:320px"><input type="text" id="cc-buscar" class="form-input" placeholder="Buscar..." oninput="ccRenderSaldos()"></div>
+          <div id="cc-tabla"><div class="loading">Cargando...</div></div>
+        </div>
+        <div class="card" id="cc-detalle-card" style="display:none">
+          <div class="card-title" id="cc-detalle-titulo">Cuenta corriente</div>
+          <div id="cc-detalle-acciones" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+          <div id="cc-detalle"></div>
+        </div>
+      </div>
+      <div id="cc-vista-registrar" style="display:none">
+        <div class="card" style="max-width:760px">
+          <div class="card-title">Registrar movimiento</div>
+          <div id="cc-r-ayuda" style="font-size:12px;color:#8a7a5a;line-height:1.6;margin-bottom:14px"></div>
+          <div class="form-grid-2">
+            <div><label class="form-label">Cuenta</label><select id="cc-r-tipo" class="form-input" onchange="ccRActualizar()"><option value="CLIENTE">Cliente</option><option value="PROVEEDOR">Proveedor</option></select></div>
+            <div><label class="form-label">Movimiento</label><select id="cc-r-concepto" class="form-input" onchange="ccRActualizar()"></select></div>
+            <div style="grid-column:1/-1"><label class="form-label" id="cc-r-tercero-label">Cliente *</label><select id="cc-r-tercero" class="form-input"></select>
+              <div id="cc-r-sin-clientes" style="display:none;font-size:11px;color:var(--rojo);margin-top:4px">No hay clientes cargados: agregalos en la pestaña "Clientes mayoristas".</div></div>
+            <div><label class="form-label">Fecha *</label><input type="date" id="cc-r-fecha" class="form-input"></div>
+            <div><label class="form-label">Importe $ *</label><input type="number" id="cc-r-importe" class="form-input" min="0" step="0.01" placeholder="0,00"></div>
+            <div id="cc-r-sentido-wrap"><label class="form-label">El saldo...</label><select id="cc-r-sentido" class="form-input" onchange="ccRActualizar()"></select></div>
+            <div id="cc-r-venc-wrap"><label class="form-label">Vencimiento (opcional)</label><input type="date" id="cc-r-vencimiento" class="form-input"></div>
+            <div id="cc-r-medio-wrap"><label class="form-label">Medio</label><select id="cc-r-medio" class="form-input"><option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Cheque</option><option>Tarjeta</option><option>Otro</option></select></div>
+            <div><label class="form-label">Comprobante / recibo</label><input type="text" id="cc-r-comprobante" class="form-input" placeholder="Opcional"></div>
+            <div style="grid-column:1/-1"><label class="form-label">Notas</label><input type="text" id="cc-r-notas" class="form-input" placeholder="Opcional"></div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px">
+            <button class="btn btn-primary" id="cc-r-guardar" onclick="ccRGuardar()">Guardar</button>
+            <span id="cc-r-ultimo" style="font-size:12px;color:var(--oliva)"></span>
+          </div>
+        </div>
+      </div>
+      <div id="cc-vista-clientes" style="display:none">
+        <div class="card" style="max-width:860px">
+          <div class="card-title" id="cl-form-titulo">Nuevo cliente mayorista</div>
+          <div class="form-grid-2">
+            <div style="grid-column:1/-1"><label class="form-label">Nombre / razón social *</label><input type="text" id="cl-nombre" class="form-input" placeholder="Ej: Supermercado Norte"></div>
+            <div><label class="form-label">CUIT</label><input type="text" id="cl-cuit" class="form-input" placeholder="30-00000000-0"></div>
+            <div><label class="form-label">Condición frente al IVA</label><select id="cl-iva" class="form-input"><option>Responsable Inscripto</option><option>Monotributo</option><option>Exento</option><option>Consumidor Final</option></select></div>
+            <div><label class="form-label">Contacto</label><input type="text" id="cl-contacto" class="form-input"></div>
+            <div><label class="form-label">Teléfono</label><input type="tel" id="cl-telefono" class="form-input"></div>
+            <div><label class="form-label">Email</label><input type="email" id="cl-email" class="form-input"></div>
+            <div><label class="form-label">Dirección</label><input type="text" id="cl-direccion" class="form-input"></div>
+            <div style="grid-column:1/-1;display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+              <label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--verde);cursor:pointer;padding-bottom:10px"><input type="checkbox" id="cl-aplazo" onchange="document.getElementById('cl-dias-wrap').style.display=this.checked?'':'none'"> Le vendemos a plazo</label>
+              <div id="cl-dias-wrap" style="display:none;width:150px"><label class="form-label">Días de plazo</label><input type="number" id="cl-dias" class="form-input" min="1" step="1" placeholder="30"></div>
+            </div>
+            <div style="grid-column:1/-1"><label class="form-label">Notas</label><input type="text" id="cl-notas" class="form-input"></div>
+          </div>
+          <div style="font-size:11px;color:#8a7a5a;margin-top:8px">El nombre identifica al cliente en las ventas y en su cuenta corriente, por eso no se puede cambiar después.</div>
+          <div style="display:flex;gap:10px;margin-top:14px">
+            <button class="btn btn-primary" onclick="ccGuardarCliente()">Guardar cliente</button>
+            <button class="btn btn-secondary" id="cl-cancelar" style="display:none" onclick="ccLimpiarCliente()">Cancelar edición</button>
+          </div>
+        </div>
+        <div class="card"><div class="card-title">Clientes cargados</div><div id="cc-lista-clientes"></div></div>
+      </div>
+    </div>
+  </div>
   <div id="panel-rep-proveedores" class="panel"><div class="loading">Cargando reporte...</div></div>
   <div id="panel-rep-caja" class="panel"><div class="loading">Cargando reporte...</div></div>
   <!-- PUNTO DE EQUILIBRIO -->
@@ -1083,6 +1169,16 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
     <div><label class="form-label">Método de pago</label><select id="m-metodo" class="form-input"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Otro</option></select></div>
     <div><label class="form-label">Plataforma</label><select id="m-plataforma" class="form-input" onchange="onCambiarPlataforma()"><option value="">Cargando...</option></select></div>
     <div><label class="form-label">Descuentos ($)</label><input type="number" id="m-descuentos" class="form-input" value="0" min="0" oninput="actualizarTotalManual()"></div>
+  </div>
+  <div id="m-mayorista-section" style="display:none;margin-top:12px;background:#f2f7e8;border:1px solid #c8dfa0;border-radius:10px;padding:12px 14px">
+    <div class="section-label" style="margin-top:0">Cliente mayorista</div>
+    <div class="form-grid-2">
+      <div><label class="form-label">Cliente *</label><select id="m-cliente" class="form-input" onchange="mOnCliente()"><option value="">— Elegí el cliente —</option></select></div>
+      <div><label class="form-label">N° comprobante</label><input type="text" id="m-comprobante" class="form-input" placeholder="Factura / remito (opcional)"></div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px;color:var(--verde);cursor:pointer"><input type="checkbox" id="m-aplazo" onchange="this.dataset.tocado='1';mOnAPlazo()"> Venta a plazo (va a la cuenta corriente del cliente)</label>
+    <div id="m-venc-wrap" style="display:none;margin-top:8px;max-width:240px"><label class="form-label">Vencimiento</label><input type="date" id="m-vencimiento" class="form-input" onchange="this.dataset.tocado='1'"></div>
+    <div style="font-size:11px;color:#8a7a5a;margin-top:8px">¿No está en la lista? <a href="javascript:void(0)" onclick="mNuevoClienteRapido()" style="color:var(--verde);font-weight:600">Agregar cliente</a> (después completás sus datos en Cuentas corrientes).</div>
   </div>
   <div id="nueva-plataforma-section" style="display:none;margin-top:12px">
     <div class="section-label">Nueva plataforma</div>
@@ -1216,7 +1312,7 @@ var MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto
 var DIAS_SEMANA = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 var COLORES = ['#233f20','#657a2d','#f4a21d','#d61220','#175ea5','#77060e'];
 var PANEL_TITLES = {
-  dashboard:'Tablero de control', ventas:'Módulo de Ventas', gastos:'Compras y Gastos',
+  dashboard:'Tablero de control', ventas:'Módulo de Ventas', gastos:'Compras y Gastos', ctacte:'Cuentas corrientes',
   salarios:'Salarios y Retiros', stock:'Stock', productos:'Productos y Recetas',
   'rep-resultados':'Estado de Resultados',
   'rep-proveedores':'Mayor de Proveedores', 'rep-caja':'Caja y Bancos',
@@ -1299,6 +1395,7 @@ function nav(id, btn) {
   if (id==='rep-equilibrio') peInicializar();
   if (id==='productos') prodInicializar();
   if (id==='rep-marginal') amCargar();
+  if (id==='ctacte') ccInicializar();
 }
 
 // Fecha AAAA-MM-DD en hora local (toISOString usa UTC: después de las 21 h en Argentina daba el día siguiente).
@@ -1738,7 +1835,7 @@ function resetProgressV(){document.getElementById('progress-wrap').classList.rem
 // MODAL MANUAL
 function cargarPlataformas(){apiGet('plataformas').then(function(lista){_plataformas=lista||[];renderSelectPlataformas();}).catch(function(){});}
 function renderSelectPlataformas(){var sel=document.getElementById('m-plataforma');if(!sel)return;sel.innerHTML='';_plataformas.forEach(function(p){var opt=document.createElement('option');opt.value=String(p.id);opt.textContent=p.nombre;sel.appendChild(opt);});var optN=document.createElement('option');optN.value='nueva';optN.textContent='+ Agregar nueva plataforma...';sel.appendChild(optN);}
-function onCambiarPlataforma(){var val=document.getElementById('m-plataforma').value;document.getElementById('nueva-plataforma-section').style.display=val==='nueva'?'block':'none';}
+function onCambiarPlataforma(){mActualizarMayorista();var val=document.getElementById('m-plataforma').value;document.getElementById('nueva-plataforma-section').style.display=val==='nueva'?'block':'none';}
 function guardarNuevaPlataforma(){var nombre=document.getElementById('np-nombre').value.trim();if(!nombre){toast('Ingresá el nombre de la plataforma',false);document.getElementById('np-nombre').focus();return;}toast('Guardando plataforma...');apiPost('agregarPlataforma',{nombre:nombre,cuit:document.getElementById('np-cuit').value,direccion:document.getElementById('np-dir').value}).then(function(r){if(r.ok){_plataformas.push({id:r.id,nombre:r.nombre});renderSelectPlataformas();document.getElementById('m-plataforma').value=String(r.id);document.getElementById('nueva-plataforma-section').style.display='none';['np-nombre','np-cuit','np-dir'].forEach(function(id){document.getElementById(id).value='';});toast('Plataforma "'+r.nombre+'" guardada ✓');}else{toast('Error: '+(r.msg||'No se pudo guardar'),false);}}).catch(function(){toast('Error de conexión',false);});}
 function cancelarNuevaPlataforma(){document.getElementById('nueva-plataforma-section').style.display='none';if(_plataformas.length)document.getElementById('m-plataforma').value=_plataformas[0].id;}
 function toggleGestionarPlat(){var sec=document.getElementById('gestionar-plat-section');if(sec.style.display==='none'||sec.style.display===''){renderGestionarPlat();sec.style.display='block';}else{sec.style.display='none';}}
@@ -1771,7 +1868,7 @@ function onSeleccionarProducto(id){var sel=document.getElementById('i-prod-'+id)
 function calcItemSubtotal(id){var cant=parseFloat(document.getElementById('i-cant-'+id).value)||0;var precio=parseFloat(document.getElementById('i-precio-'+id).value)||0;document.getElementById('i-sub-'+id).textContent='$ '+Math.round(cant*precio).toLocaleString('es-AR');actualizarTotalManual();}
 function quitarItemRow(id){var row=document.getElementById('item-row-'+id);if(row)row.remove();actualizarTotalManual();}
 function actualizarTotalManual(){var totalItems=0;for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var cant=parseFloat(document.getElementById('i-cant-'+i)&&document.getElementById('i-cant-'+i).value)||0;var precio=parseFloat(document.getElementById('i-precio-'+i)&&document.getElementById('i-precio-'+i).value)||0;totalItems+=cant*precio;}var desc=parseFloat(document.getElementById('m-descuentos').value)||0;document.getElementById('m-total-display').textContent='$ '+Math.round(totalItems-desc).toLocaleString('es-AR');}
-function abrirCargaManual(){var hoy=new Date();var yy=hoy.getFullYear(),mm=String(hoy.getMonth()+1).padStart(2,'0'),dd=String(hoy.getDate()).padStart(2,'0');document.getElementById('m-fecha').value=yy+'-'+mm+'-'+dd;document.getElementById('m-descuentos').value='0';document.getElementById('items-list').innerHTML='';_itemCount=0;document.getElementById('nueva-plataforma-section').style.display='none';document.getElementById('gestionar-plat-section').style.display='none';document.getElementById('m-total-display').textContent='$ 0';document.getElementById('modal-overlay').style.display='block';document.getElementById('modal-manual').style.display='block';if(_plataformas.length===0)cargarPlataformas();
+function abrirCargaManual(){setTimeout(mResetMayorista,0);var hoy=new Date();var yy=hoy.getFullYear(),mm=String(hoy.getMonth()+1).padStart(2,'0'),dd=String(hoy.getDate()).padStart(2,'0');document.getElementById('m-fecha').value=yy+'-'+mm+'-'+dd;document.getElementById('m-descuentos').value='0';document.getElementById('items-list').innerHTML='';_itemCount=0;document.getElementById('nueva-plataforma-section').style.display='none';document.getElementById('gestionar-plat-section').style.display='none';document.getElementById('m-total-display').textContent='$ 0';document.getElementById('modal-overlay').style.display='block';document.getElementById('modal-manual').style.display='block';if(_plataformas.length===0)cargarPlataformas();
   // Asegurar que _prodCache esté disponible para el select dinámico
   if (_prodCache && _prodCache.length) { agregarItemRow(); }
   else { apiGet('productos').then(function(data){ _prodCache=data||[]; agregarItemRow(); }).catch(function(){ agregarItemRow(); }); }
@@ -1798,7 +1895,7 @@ function precioCartaVentaManual(nombreProd) {
   return 0;
 }
 function cerrarCargaManual(){document.getElementById('modal-manual').style.display='none';document.getElementById('modal-overlay').style.display='none';}
-function guardarVentaManual(){var mes=parseInt(document.getElementById('v-mes').value);var fechaInput=document.getElementById('m-fecha').value;var total=0;var items=[];for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var selProd=document.getElementById('i-prod-'+i);var txtProd=document.getElementById('i-prod-txt-'+i);var prod=selProd.value==='__otro__'?txtProd.value.trim():selProd.value;var cant=parseFloat(document.getElementById('i-cant-'+i).value)||1;var precio=parseFloat(document.getElementById('i-precio-'+i).value)||0;if(!prod||!precio)continue;items.push({producto:prod,cantidad:cant,precioUnit:precio,subtotal:cant*precio});total+=cant*precio;}if(!fechaInput||!items.length){toast('Completá fecha y al menos un producto con precio',false);return;}var partes=fechaInput.split('-');var fechaFmt=partes[2]+'/'+partes[1]+'/'+partes[0];var platSel=document.getElementById('m-plataforma');var platNombre=platSel.options[platSel.selectedIndex]?platSel.options[platSel.selectedIndex].text:'Manual';if(platSel.value==='nueva'){toast('Guardá primero la plataforma nueva',false);return;}var data={mes:MESES[parseInt(partes[1],10)]||MESES[mes],fecha:fechaFmt,plataforma:platNombre,metodo:document.getElementById('m-metodo').value,descuentos:parseFloat(document.getElementById('m-descuentos').value)||0,items:items};cerrarCargaManual();toast('Guardando...');apiPost('registrarVentaManual',data).then(function(r){if(r.ok){toast('Venta registrada ✓');cargarModuloVentas();}else toast('Error: '+(r.msg||''),false);});}
+function guardarVentaManual(){var mes=parseInt(document.getElementById('v-mes').value);var fechaInput=document.getElementById('m-fecha').value;var total=0;var items=[];for(var i=1;i<=_itemCount;i++){var row=document.getElementById('item-row-'+i);if(!row)continue;var selProd=document.getElementById('i-prod-'+i);var txtProd=document.getElementById('i-prod-txt-'+i);var prod=selProd.value==='__otro__'?txtProd.value.trim():selProd.value;var cant=parseFloat(document.getElementById('i-cant-'+i).value)||1;var precio=parseFloat(document.getElementById('i-precio-'+i).value)||0;if(!prod||!precio)continue;items.push({producto:prod,cantidad:cant,precioUnit:precio,subtotal:cant*precio});total+=cant*precio;}if(!fechaInput||!items.length){toast('Completá fecha y al menos un producto con precio',false);return;}var partes=fechaInput.split('-');var fechaFmt=partes[2]+'/'+partes[1]+'/'+partes[0];var platSel=document.getElementById('m-plataforma');var platNombre=platSel.options[platSel.selectedIndex]?platSel.options[platSel.selectedIndex].text:'Manual';if(platSel.value==='nueva'){toast('Guardá primero la plataforma nueva',false);return;}var data={mes:MESES[parseInt(partes[1],10)]||MESES[mes],fecha:fechaFmt,plataforma:platNombre,metodo:document.getElementById('m-metodo').value,descuentos:parseFloat(document.getElementById('m-descuentos').value)||0,items:items};if(!mAgregarDatosMayorista(data))return;cerrarCargaManual();toast('Guardando...');apiPost('registrarVentaManual',data).then(function(r){if(r.ok){toast('Venta registrada ✓');cargarModuloVentas();}else toast('Error: '+(r.msg||''),false);});}
 
 // ============================================================
 // HISTORIAL VENTAS
@@ -1824,7 +1921,7 @@ var V_ALIAS_CAMPOS={
 var V_NOMBRES_CANAL={'delivery':'Envío a domicilio','takeaway':'Retiro en local','take away':'Retiro en local'};
 function vNombreCanal(c){var k=String(c||'').trim().toLowerCase();return V_NOMBRES_CANAL[k]||c;}
 function vCampo(r,campo){var keys=V_ALIAS_CAMPOS[campo]||[campo];for(var i=0;i<keys.length;i++){var v=r[keys[i]];if(v!=null&&v!=='')return v;}return null;}
-function vRenderTabla(rows,tipo){var cont=document.getElementById('v-tabla-historial');if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cols=tipo==='ventasDia'?[['Mes','Mes'],['Fecha','Fecha'],['Canal','Canal'],['Método','Metodo'],['Pedidos','Pedidos'],['Descuentos','Descuentos'],['Promedio por pedido','TicketMedio'],['Total','Total'],['Origen','Origen']]:[['Mes','Mes'],['Producto','Producto'],['Cantidad','Cantidad'],['Subtotal','Subtotal'],['Origen','Origen']];var deleteAction=tipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c[0]+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=vCampo(r,c[1]);if(val==null)val='-';if(c[1]==='Canal')val=vNombreCanal(val);if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div>';html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
+function vRenderTabla(rows,tipo){var cont=document.getElementById('v-tabla-historial');if(!rows||!rows.length){cont.innerHTML='<div class="loading">Sin registros para el período.</div>';return;}var cols=tipo==='ventasDia'?[['Mes','Mes'],['Fecha','Fecha'],['Canal','Canal'],['Método','Metodo'],['Cliente','Cliente'],['Pedidos','Pedidos'],['Descuentos','Descuentos'],['Promedio por pedido','TicketMedio'],['Total','Total'],['Origen','Origen']]:[['Mes','Mes'],['Producto','Producto'],['Cantidad','Cantidad'],['Subtotal','Subtotal'],['Origen','Origen']];var deleteAction=tipo==='ventasDia'?'eliminarVentaDia':'eliminarVentaProducto';var html='<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr>'+cols.map(function(c){return'<th>'+c[0]+'</th>';}).join('')+'<th style="width:44px"></th></tr></thead><tbody>';rows.forEach(function(r,idx){html+='<tr>'+cols.map(function(c){var val=vCampo(r,c[1]);if(val==null)val='-';if(c[1]==='Canal')val=vNombreCanal(val);if(typeof val==='number')return'<td class="num">'+val.toLocaleString('es-AR',{minimumFractionDigits:2})+'</td>';return'<td>'+val+'</td>';}).join('');var rowIndex=r['_rowIndex']||0;html+='<td><button onclick="vEliminarRegistro(\''+deleteAction+'\','+rowIndex+','+idx+')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar">🗑</button></td></tr>';});html+='</tbody></table></div>';html+='<div style="font-size:11px;color:#8a7a5a;margin-top:8px">'+rows.length+' registro'+(rows.length!==1?'s':'')+'</div>';cont.innerHTML=html;}
 function vEliminarRegistro(deleteAction,rowIndex,idx){if(!confirm('¿Eliminar este registro de ventas?'))return;apiPost(deleteAction,{rowIndex:rowIndex}).then(function(r){if(r.ok){toast('Eliminado ✓');vCargarHistorial();}else toast('Error: '+(r.msg||''),false);});}
 
 function vMostrarBorradoSelectivo(){
@@ -2215,7 +2312,9 @@ function gGuardar(){var fecha=document.getElementById('g-fecha').value,notas=doc
       notas:it.notas||''
     };
   });
-  var payload={fecha:fecha, proveedor:prov, comprobante:comprobante, iva:ivaPct, notas:notas, items:lineas};
+  var aPlazo=document.getElementById('g-aplazo').checked;
+  if(aPlazo&&!prov) return toast('Para una compra a plazo elegí el proveedor',false);
+  var payload={fecha:fecha, proveedor:prov, comprobante:comprobante, iva:ivaPct, notas:notas, items:lineas, aPlazo:aPlazo, vencimiento:aPlazo?document.getElementById('g-vencimiento').value:''};
   if(_gEditando){
     payload.original=_gEditando;
     toast('Guardando cambios...');
@@ -2234,7 +2333,7 @@ function gGuardar(){var fecha=document.getElementById('g-fecha').value,notas=doc
     else toast('Error al guardar la compra: '+((r&&(r.msg||r.error))||''),false);
   }).catch(function(e){toast('Error: '+e.message,false);});
 }else if(gTipoActual==='gasto'){if(!gNatActual)return toast('Seleccioná si el gasto es Fijo o Variable',false);var concepto=document.getElementById('g-concepto').value.trim(),monto=document.getElementById('g-monto-gasto').value;if(!concepto||!monto)return toast('Completá concepto y monto',false);apiPost(gNatActual==='fijo'?'registrarGastoFijo':'registrarGastoVariable',{fecha:fecha,concepto:concepto,categoria:document.getElementById('g-cat-gasto').value,periodo:document.getElementById('g-periodo-gasto').value,monto:monto,proveedor:prov,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='envio'){var plat=document.getElementById('g-plataforma').value,mEnv=document.getElementById('g-monto-envio').value;if(!plat||!mEnv)return toast('Completá plataforma y monto',false);apiPost('registrarEnvio',{fecha:fecha,plataforma:plat,descripcion:document.getElementById('g-desc-envio').value,monto:mEnv,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='bien'){var cat=document.getElementById('g-cat-bien').value,desc=document.getElementById('g-desc-bien').value.trim(),mBien=document.getElementById('g-monto-bien').value;if(!cat||!desc||!mBien)return toast('Completá categoría, descripción y monto',false);apiPost('registrarBienDeUso',{fecha:fecha,categoria:cat,descripcion:desc,proveedor:prov,monto:mBien,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='alquiler'){var per=document.getElementById('g-periodo-alq').value.trim(),mAlq=document.getElementById('g-monto-alq').value;if(!per||!mAlq)return toast('Completá período y monto',false);apiPost('registrarAlquiler',{fecha:fecha,periodo:per,monto:mAlq,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}}
-function gLimpiarForm(){var hoy=fechaLocalISO(new Date());document.getElementById('g-fecha').value=hoy;['g-comprobante','g-concepto','g-cat-gasto','g-periodo-gasto','g-monto-gasto','g-plataforma','g-desc-envio','g-monto-envio','g-cat-bien','g-desc-bien','g-monto-bien','g-periodo-alq','g-monto-alq','g-notas','g-subtotal','g-iva-monto','g-perc-iva','g-perc-iibb','g-perc-gan','g-total-pagar'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});var ivaEl=document.getElementById('g-iva');if(ivaEl)ivaEl.value='21';document.getElementById('g-vida-util-info').style.display='none';if(gTipoActual==='gasto'){document.querySelectorAll('.nat-sel-btn').forEach(function(b){b.classList.remove('active');});gNatActual=null;}// Limpiar ítems de compra
+function gLimpiarForm(){var hoy=fechaLocalISO(new Date());document.getElementById('g-fecha').value=hoy;var gap=document.getElementById('g-aplazo');if(gap){gap.checked=false;document.getElementById('g-vencimiento').value='';gOnAPlazo();}['g-comprobante','g-concepto','g-cat-gasto','g-periodo-gasto','g-monto-gasto','g-plataforma','g-desc-envio','g-monto-envio','g-cat-bien','g-desc-bien','g-monto-bien','g-periodo-alq','g-monto-alq','g-notas','g-subtotal','g-iva-monto','g-perc-iva','g-perc-iibb','g-perc-gan','g-total-pagar'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});var ivaEl=document.getElementById('g-iva');if(ivaEl)ivaEl.value='21';document.getElementById('g-vida-util-info').style.display='none';if(gTipoActual==='gasto'){document.querySelectorAll('.nat-sel-btn').forEach(function(b){b.classList.remove('active');});gNatActual=null;}// Limpiar ítems de compra
 var cont=document.getElementById('g-items-compra');if(cont)cont.innerHTML='';var tot=document.getElementById('ic-total-row');if(tot)tot.remove();_gCompraItems=0;// Agregar un ítem vacío nuevo si estamos en compra
 if(gTipoActual==='compra'){setTimeout(function(){gAgregarItemCompra();},50);}}
 function gLlenarSelectsProveedores(){var sel=document.getElementById('g-proveedor');if(!sel)return;sel.innerHTML='<option value="">Sin proveedor</option>';gProveedores.forEach(function(p){sel.appendChild(new Option(p.nombre,p.nombre));});}
@@ -2305,6 +2404,7 @@ function gRenderCompras(cont, busqConc, busqProv) {
     html += '<tr style="cursor:pointer" onclick="gToggleComprobante(' + i + ')" data-cmp="' + i + '">' +
       '<td style="text-align:center;color:var(--oliva)" id="g-cmp-flecha-' + i + '">' + (abierto ? '▾' : '▸') + '</td>' +
       '<td>' + esc(g.fecha) + '</td><td class="celda-prov">' + (esc(g.proveedor) || '<span style="color:#8a7a5a">Sin proveedor</span>') +
+        (g.items.some(function(r) { return r.CtaCte; }) ? ' <span title="Compra a plazo: está en la cuenta corriente del proveedor" style="font-size:9px;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:8px;white-space:nowrap">a plazo</span>' : '') +
         '<div class="solo-movil" style="font-size:10px;color:#8a7a5a">' + (esc(g.comprobante) || 'Sin número') + ' · ' + g.items.length + ' ítem' + (g.items.length !== 1 ? 's' : '') + '</div></td>' +
       '<td class="no-movil">' + (esc(g.comprobante) || '<span style="color:#8a7a5a">—</span>') + '</td>' +
       '<td class="num no-movil">' + g.items.length + '</td><td class="num no-movil">' + f2(g.subtotal) + '</td><td class="num no-movil">' + f2(g.iva) + '</td>' +
@@ -2413,6 +2513,10 @@ function gCargarComprobanteEnForm(g) {
   document.getElementById('g-perc-iibb').value = suma('PercepcionIIBB') || '';
   document.getElementById('g-perc-gan').value = suma('PercepcionGanancias') || '';
   gCalcTotal();
+  var refCC = g.items.map(function(r) { return String(r.CtaCte || ''); }).filter(Boolean)[0];
+  document.getElementById('g-aplazo').checked = !!refCC;
+  document.getElementById('g-vencimiento').value = refCC ? ccIsoDesdeTxt(g.items[0].Vencimiento) : '';
+  gOnAPlazo();
   _gEditando = gCmpOriginal(g);
   gMostrarModoEdicion(g);
   document.getElementById('gtab-registrar').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -4631,6 +4735,362 @@ function fpVerDetalle(nombre, sinScroll) {
   var card = document.getElementById('fp-detalle-card');
   card.style.display = '';
   if (!sinScroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================================
+// CUENTAS CORRIENTES (clientes mayoristas y proveedores)
+// ============================================================
+var _ccVista = 'CLIENTE', _ccResumen = {}, _ccSel = null, _ccClientes = [], _ccProveedores = [], _ccEditCliente = null;
+var CC_CONCEPTOS = { SALDO_INICIAL: 'Saldo inicial', VENTA: 'Venta', COBRO: 'Cobro', COMPRA: 'Compra', PAGO: 'Pago', AJUSTE: 'Ajuste' };
+var CC_MEDIOS = ['Efectivo', 'Transferencia', 'Mercado Pago', 'Cheque', 'Tarjeta', 'Otro'];
+
+function ccEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+function ccFmt(n) { return '$ ' + (Math.round((n || 0) * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function ccIsoDesdeTxt(t) { var m = String(t || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2) : ''; }
+function ccSumarDias(iso, dias) { var p = String(iso || '').split('-'); if (p.length !== 3) return ''; var d = new Date(+p[0], +p[1] - 1, +p[2] + (parseInt(dias, 10) || 0)); return fechaLocalISO(d); }
+
+function ccInicializar() {
+  // Al entrar se muestran los saldos (de clientes, o de proveedores si era lo último que se miró)
+  if (_ccVista !== 'CLIENTE' && _ccVista !== 'PROVEEDOR') _ccVista = _ccUltimoSaldo || 'CLIENTE';
+  ccCargarListas().then(function() {
+    var btn = document.querySelector('#panel-ctacte .gtab[data-cctab="' + (_ccVista === 'PROVEEDOR' ? 'PROVEEDOR' : _ccVista) + '"]');
+    ccTab(_ccVista, btn || document.querySelector('#panel-ctacte .gtab'));
+  });
+}
+
+function ccCargarListas() {
+  return Promise.all([apiGet('clientes'), apiGet('proveedores')]).then(function(r) {
+    _ccClientes = r[0] || []; _ccProveedores = (r[1] || []).filter(function(p) { return String(p.nombre || '').trim(); });
+  }).catch(function() {});
+}
+
+var _ccUltimoSaldo = 'CLIENTE';
+function ccTab(vista, btn) {
+  _ccVista = vista;
+  if (vista === 'CLIENTE' || vista === 'PROVEEDOR') _ccUltimoSaldo = vista;
+  document.querySelectorAll('#panel-ctacte .gtab').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var saldos = vista === 'CLIENTE' || vista === 'PROVEEDOR';
+  document.getElementById('cc-vista-saldos').style.display = saldos ? '' : 'none';
+  document.getElementById('cc-vista-registrar').style.display = vista === 'registrar' ? '' : 'none';
+  document.getElementById('cc-vista-clientes').style.display = vista === 'clientes' ? '' : 'none';
+  if (saldos) { _ccSel = null; document.getElementById('cc-detalle-card').style.display = 'none'; ccCargarSaldos(); }
+  if (vista === 'registrar') ccRPreparar();
+  if (vista === 'clientes') ccRenderClientes();
+}
+
+// ---------- Saldos ----------
+function ccCargarSaldos() {
+  var tipo = _ccVista;
+  document.getElementById('cc-tabla').innerHTML = '<div class="loading">Cargando saldos...</div>';
+  apiGet('ctaCteResumen', { tipo: tipo }).then(function(r) {
+    if (_ccVista !== tipo) return;
+    _ccResumen[tipo] = r || { filas: [], totales: {} };
+    ccRenderSaldos();
+  }).catch(function(e) { document.getElementById('cc-tabla').innerHTML = '<div class="loading">Error al cargar: ' + ccEsc(e.message) + '</div>'; });
+}
+
+function ccRenderSaldos() {
+  var tipo = _ccVista, r = _ccResumen[tipo]; if (!r) return;
+  var esCli = tipo === 'CLIENTE', t = r.totales || {};
+  var aFavor = r.filas.filter(function(f) { return f.saldo < 0; }).reduce(function(s, f) { return s - f.saldo; }, 0);
+  document.getElementById('cc-kpis').innerHTML =
+    '<div class="kpi"><div class="kpi-label">' + (esCli ? 'Total a cobrar' : 'Total a pagar') + '</div><div class="kpi-value">' + ccFmt(t.saldo + aFavor) + '</div>' +
+      (aFavor > 0.005 ? '<div class="kpi-delta" style="color:#8a7a5a">Saldos a favor ' + (esCli ? 'de clientes' : 'nuestro') + ': ' + ccFmt(aFavor) + '</div>' : '') + '</div>' +
+    '<div class="kpi"><div class="kpi-label">Vencido</div><div class="kpi-value" style="color:' + (t.vencido > 0 ? 'var(--rojo)' : 'var(--verde)') + '">' + ccFmt(t.vencido) + '</div>' +
+      '<div class="kpi-delta" style="color:#8a7a5a">Más de 90 días: ' + ccFmt(t.mas90) + '</div></div>' +
+    '<div class="kpi"><div class="kpi-label">Al día</div><div class="kpi-value" style="color:var(--oliva)">' + ccFmt(t.alDia) + '</div></div>' +
+    '<div class="kpi"><div class="kpi-label">' + (esCli ? 'Clientes con saldo' : 'Proveedores con saldo') + '</div><div class="kpi-value">' +
+      r.filas.filter(function(f) { return Math.abs(f.saldo) > 0.005; }).length + '</div></div>';
+  var soloSaldo = document.getElementById('cc-con-saldo').checked;
+  var busq = (document.getElementById('cc-buscar').value || '').toLowerCase().trim();
+  var filas = r.filas.filter(function(f) {
+    return (!soloSaldo || Math.abs(f.saldo) > 0.005) && (!busq || f.tercero.toLowerCase().indexOf(busq) >= 0);
+  });
+  document.getElementById('cc-titulo-tabla').textContent = esCli ? 'Saldos de clientes' : 'Saldos de proveedores';
+  if (!filas.length) {
+    document.getElementById('cc-tabla').innerHTML = '<div class="loading">' + (r.filas.length ? 'No hay ' + (esCli ? 'clientes' : 'proveedores') + ' para el filtro.' :
+      (esCli ? 'Todavía no hay clientes con movimientos. Cargá los clientes mayoristas y sus saldos iniciales.' : 'Todavía no hay movimientos con proveedores.')) + '</div>';
+    return;
+  }
+  var celda = function(v, cls) { return '<td class="num ' + (cls || '') + '"' + (v > 0.005 && String(cls || '').indexOf('cc-aldia') < 0 ? ' style="color:var(--rojo)"' : '') + '>' + (Math.abs(v) > 0.005 ? ccFmt(v) : '<span style="color:#ccc">—</span>') + '</td>'; };
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>' + (esCli ? 'Cliente' : 'Proveedor') + '</th>' +
+    '<th style="text-align:right">Saldo</th><th style="text-align:right">Vencido</th><th class="no-movil" style="text-align:right">Al día</th>' +
+    '<th class="no-movil" style="text-align:right">1–30 d</th><th class="no-movil" style="text-align:right">31–60 d</th><th class="no-movil" style="text-align:right">61–90 d</th><th class="no-movil" style="text-align:right">+90 d</th>' +
+    '<th class="no-movil">Último mov.</th></tr></thead><tbody>';
+  filas.forEach(function(f, i) {
+    var saldoTxt = f.saldo < -0.005 ? '<span style="color:var(--oliva)">' + ccFmt(-f.saldo) + '</span><div style="font-size:9px;color:var(--oliva)">a favor ' + (esCli ? 'del cliente' : 'nuestro') + '</div>' : ccFmt(f.saldo);
+    html += '<tr style="cursor:pointer" onclick="ccVerDetalle(' + i + ')" data-cc="' + i + '"' + (_ccSel === f.tercero ? ' class="cc-sel"' : '') + '>' +
+      '<td class="celda-prov" style="font-weight:600;color:var(--verde)">' + ccEsc(f.tercero) + (f.activo ? '' : ' <span style="font-size:9px;color:#8a7a5a">(inactivo)</span>') + ' ›</td>' +
+      '<td class="num" style="font-weight:700">' + saldoTxt + '</td>' + celda(f.vencido) + celda(f.alDia, 'no-movil cc-aldia') +
+      celda(f.d30, 'no-movil') + celda(f.d60, 'no-movil') + celda(f.d90, 'no-movil') + celda(f.mas90, 'no-movil') +
+      '<td class="no-movil" style="color:#8a7a5a">' + (f.ultimoMovimiento || '—') + '</td></tr>';
+  });
+  html += '</tbody></table></div><div style="font-size:11px;color:#8a7a5a;margin-top:8px;line-height:1.6">Antigüedad: lo cobrado/pagado se aplica primero a lo más viejo; lo que queda pendiente se ubica según los días desde su vencimiento' +
+    (esCli ? ' (si no tiene, la fecha de la venta más los días de plazo del cliente)' : ' (si no tiene, la fecha de la compra)') + '. Tocá una fila para ver la cuenta.</div>';
+  document.getElementById('cc-tabla').innerHTML = html;
+  ccFilasVisibles = filas;
+}
+var ccFilasVisibles = [];
+
+function ccVerDetalle(i) {
+  var f = ccFilasVisibles[i]; if (!f) return;
+  _ccSel = f.tercero;
+  document.querySelectorAll('#cc-tabla tr[data-cc]').forEach(function(tr) { tr.classList.toggle('cc-sel', +tr.getAttribute('data-cc') === i); });
+  ccCargarDetalle(true);
+}
+
+function ccCargarDetalle(scroll) {
+  var tipo = _ccVista, tercero = _ccSel, esCli = tipo === 'CLIENTE';
+  var card = document.getElementById('cc-detalle-card');
+  card.style.display = '';
+  document.getElementById('cc-detalle-titulo').innerHTML = '<span>Cuenta corriente: ' + ccEsc(tercero) + '</span>';
+  document.getElementById('cc-detalle-acciones').innerHTML =
+    '<button class="btn btn-primary btn-sm" onclick="ccIrARegistrar(\'' + (esCli ? 'COBRO' : 'PAGO') + '\')">' + (esCli ? '💵 Registrar cobro' : '💵 Registrar pago') + '</button>' +
+    '<button class="btn btn-secondary btn-sm" onclick="ccIrARegistrar(\'SALDO_INICIAL\')">Cargar saldo inicial</button>' +
+    '<button class="btn btn-secondary btn-sm" onclick="ccIrARegistrar(\'AJUSTE\')">Ajuste</button>';
+  document.getElementById('cc-detalle').innerHTML = '<div class="loading">Cargando movimientos...</div>';
+  if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  apiGet('ctaCteMovimientos', { tipo: tipo, tercero: tercero }).then(function(movs) {
+    if (_ccSel !== tercero || _ccVista !== tipo) return;
+    movs = movs || [];
+    if (!movs.length) { document.getElementById('cc-detalle').innerHTML = '<div class="loading">Sin movimientos. Si tenía un saldo previo, cargalo como saldo inicial.</div>'; return; }
+    var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Fecha</th><th>Concepto</th><th class="no-movil">Comprobante</th><th class="no-movil">Medio</th>' +
+      '<th class="no-movil" style="text-align:right">' + (esCli ? 'Debe (venta)' : 'Debe (pago)') + '</th><th class="no-movil" style="text-align:right">' + (esCli ? 'Haber (cobro)' : 'Haber (compra)') + '</th>' +
+      '<th class="solo-movil-td" style="text-align:right">Importe</th><th style="text-align:right">Saldo</th><th class="no-movil">Vence</th><th style="width:36px"></th></tr></thead><tbody>';
+    movs.slice().reverse().forEach(function(m) {
+      var efecto = esCli ? m.debe - m.haber : m.haber - m.debe;
+      html += '<tr><td><span class="no-movil">' + m.fecha + '</span><span class="solo-movil">' + m.fecha.replace(/\/(\d{2})(\d{2})$/, '/$2') + '</span></td><td class="celda-prov">' + (CC_CONCEPTOS[m.concepto] || m.concepto) +
+        (m.automatico ? ' <span title="Generado por una ' + (m.concepto === 'VENTA' ? 'venta' : 'compra') + ': se corrige desde ahí" style="font-size:9px;background:#e8f0c8;color:var(--oliva);padding:1px 5px;border-radius:8px">auto</span>' : '') +
+        '<div class="solo-movil" style="font-size:10px;color:#8a7a5a">' + ccEsc([m.comprobante, m.medio].filter(Boolean).join(' · ')) + '</div>' +
+        (m.notas ? '<div style="font-size:10px;color:#8a7a5a;white-space:normal">' + ccEsc(m.notas) + '</div>' : '') + '</td>' +
+        '<td class="no-movil">' + ccEsc(m.comprobante || '—') + '</td><td class="no-movil">' + ccEsc(m.medio || '—') + '</td>' +
+        '<td class="num no-movil">' + (m.debe ? ccFmt(m.debe) : '') + '</td><td class="num no-movil">' + (m.haber ? ccFmt(m.haber) : '') + '</td>' +
+        '<td class="num solo-movil-td" style="color:' + (efecto >= 0 ? 'var(--verde)' : 'var(--oliva)') + '">' + (efecto >= 0 ? '+' : '−') + ccFmt(Math.abs(efecto)).replace('$ ', '') + '</td>' +
+        '<td class="num" style="font-weight:600"><span class="no-movil">$ </span>' + ccFmt(m.saldo).replace('$ ', '') + '</td><td class="no-movil" style="color:#8a7a5a">' + (m.vencimiento || '') + '</td>' +
+        '<td>' + (m.automatico ? '' : '<button onclick="ccEliminarMov(\'' + m.id + '\')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar movimiento">🗑</button>') + '</td></tr>';
+    });
+    html += '</tbody></table></div><div style="font-size:11px;color:#8a7a5a;margin-top:8px">Más recientes primero. ' +
+      (esCli ? 'Saldo positivo = el cliente nos debe.' : 'Saldo positivo = le debemos al proveedor.') +
+      ' Los movimientos "auto" vienen de una ' + (esCli ? 'venta a plazo (se corrigen desde Ventas → Historial)' : 'compra a plazo (se corrigen editando el comprobante en Compras → Historial)') + '.</div>';
+    document.getElementById('cc-detalle').innerHTML = html;
+  }).catch(function(e) { document.getElementById('cc-detalle').innerHTML = '<div class="loading">Error: ' + ccEsc(e.message) + '</div>'; });
+}
+
+function ccEliminarMov(id) {
+  if (!confirm('¿Eliminar este movimiento de la cuenta corriente?')) return;
+  apiPost('eliminarMovimientoCC', { id: id }).then(function(r) {
+    if (!r.ok) return toast('Error: ' + (r.msg || r.error || ''), false);
+    toast('Movimiento eliminado ✓');
+    ccCargarSaldos(); ccCargarDetalle(false);
+  }).catch(function(e) { toast('Error: ' + e.message, false); });
+}
+
+function ccIrARegistrar(concepto) {
+  var tipo = _ccVista, tercero = _ccSel;
+  ccTab('registrar', document.querySelector('#panel-ctacte .gtab[data-cctab="registrar"]'));
+  document.getElementById('cc-r-tipo').value = tipo;
+  ccRActualizar();
+  document.getElementById('cc-r-concepto').value = concepto;
+  ccRActualizar();
+  document.getElementById('cc-r-tercero').value = tercero;
+  if (concepto === 'COBRO' || concepto === 'PAGO') document.getElementById('cc-r-fecha').value = fechaLocalISO(new Date());
+  document.getElementById('cc-r-importe').focus();
+}
+
+// ---------- Registrar movimiento ----------
+function ccRPreparar() {
+  var f = document.getElementById('cc-r-fecha');
+  if (!f.value) f.value = fechaLocalISO(new Date());
+  ccRActualizar();
+}
+
+function ccRActualizar() {
+  var tipo = document.getElementById('cc-r-tipo').value, esCli = tipo === 'CLIENTE';
+  var selC = document.getElementById('cc-r-concepto'), prev = selC.value;
+  var opts = esCli ? [['COBRO', 'Cobro'], ['SALDO_INICIAL', 'Saldo inicial'], ['AJUSTE', 'Ajuste']] : [['PAGO', 'Pago'], ['SALDO_INICIAL', 'Saldo inicial'], ['AJUSTE', 'Ajuste']];
+  selC.innerHTML = opts.map(function(o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('');
+  if (opts.some(function(o) { return o[0] === prev; })) selC.value = prev;
+  var concepto = selC.value;
+  var selT = document.getElementById('cc-r-tercero'), prevT = selT.value;
+  var lista = esCli ? _ccClientes.filter(function(c) { return c.activo; }).map(function(c) { return c.nombre; }) : _ccProveedores.map(function(p) { return String(p.nombre).trim(); });
+  selT.innerHTML = '<option value="">— Elegí ' + (esCli ? 'el cliente' : 'el proveedor') + ' —</option>' + lista.map(function(n) { return '<option value="' + ccEsc(n) + '">' + ccEsc(n) + '</option>'; }).join('');
+  if (lista.indexOf(prevT) >= 0) selT.value = prevT;
+  document.getElementById('cc-r-tercero-label').textContent = esCli ? 'Cliente *' : 'Proveedor *';
+  document.getElementById('cc-r-sin-clientes').style.display = esCli && !lista.length ? '' : 'none';
+  var conSentido = concepto === 'SALDO_INICIAL' || concepto === 'AJUSTE';
+  document.getElementById('cc-r-sentido-wrap').style.display = conSentido ? '' : 'none';
+  document.getElementById('cc-r-medio-wrap').style.display = conSentido ? 'none' : '';
+  var selS = document.getElementById('cc-r-sentido'), prevS = selS.value || 'AUMENTA';
+  selS.innerHTML = esCli
+    ? '<option value="AUMENTA">El cliente nos debe (a cobrar)</option><option value="DISMINUYE">Saldo a favor del cliente</option>'
+    : '<option value="AUMENTA">Le debemos al proveedor (a pagar)</option><option value="DISMINUYE">Saldo a favor nuestro</option>';
+  selS.value = prevS;
+  document.getElementById('cc-r-venc-wrap').style.display = conSentido && selS.value === 'AUMENTA' ? '' : 'none';
+  document.getElementById('cc-r-ayuda').innerHTML = concepto === 'SALDO_INICIAL'
+    ? 'Cargá lo que ' + (esCli ? 'te debe hoy el cliente' : 'le debés hoy al proveedor') + ' para arrancar la cuenta. Podés cargar un único saldo o una línea por cada factura pendiente con su vencimiento, para que la antigüedad sea exacta.'
+    : concepto === 'AJUSTE' ? 'Para corregir diferencias (redondeos, notas de crédito, bonificaciones). Indicá si aumenta o disminuye el saldo.'
+    : esCli ? 'Lo que pagó el cliente. Se descuenta de su saldo empezando por lo más viejo.' : 'Lo que le pagaste al proveedor. Se descuenta de su saldo empezando por lo más viejo.';
+}
+
+function ccRGuardar() {
+  var v = function(id) { return document.getElementById(id).value; };
+  var concepto = v('cc-r-concepto'), conSentido = concepto === 'SALDO_INICIAL' || concepto === 'AJUSTE';
+  var data = { tipo: v('cc-r-tipo'), concepto: concepto, tercero: v('cc-r-tercero'), fecha: v('cc-r-fecha'), importe: parseFloat(v('cc-r-importe')),
+               sentido: conSentido ? v('cc-r-sentido') : '', medio: conSentido ? '' : v('cc-r-medio'), comprobante: v('cc-r-comprobante').trim(),
+               vencimiento: conSentido && v('cc-r-sentido') === 'AUMENTA' ? v('cc-r-vencimiento') : '', notas: v('cc-r-notas').trim() };
+  if (!data.tercero) return toast('Elegí ' + (data.tipo === 'CLIENTE' ? 'el cliente' : 'el proveedor'), false);
+  if (!data.fecha) return toast('Cargá la fecha', false);
+  if (!(data.importe > 0)) return toast('El importe tiene que ser mayor a cero', false);
+  var btn = document.getElementById('cc-r-guardar'); btn.disabled = true;
+  apiPost('registrarMovimientoCC', data).then(function(r) {
+    btn.disabled = false;
+    if (!r.ok) return toast('Error: ' + (r.msg || r.error || ''), false);
+    toast((CC_CONCEPTOS[concepto] || 'Movimiento') + ' registrado ✓');
+    ['cc-r-importe', 'cc-r-comprobante', 'cc-r-notas', 'cc-r-vencimiento'].forEach(function(id) { document.getElementById(id).value = ''; });
+    document.getElementById('cc-r-ultimo').innerHTML = '✓ Último: ' + (CC_CONCEPTOS[concepto] || '') + ' de ' + ccFmt(data.importe) + ' — ' + ccEsc(data.tercero) +
+      ' · <a href="javascript:void(0)" onclick="ccVerCuentaDe(\'' + data.tipo + '\',\'' + ccEsc(data.tercero).replace(/\\/g, '\\\\') + '\')">ver la cuenta</a>';
+  }).catch(function(e) { btn.disabled = false; toast('Error: ' + e.message, false); });
+}
+
+function ccVerCuentaDe(tipo, tercero) {
+  ccTab(tipo, document.querySelector('#panel-ctacte .gtab[data-cctab="' + tipo + '"]'));
+  _ccSel = tercero;
+  ccCargarDetalle(true);
+}
+
+// ---------- Clientes mayoristas ----------
+function ccRenderClientes() {
+  var cont = document.getElementById('cc-lista-clientes');
+  if (!_ccClientes.length) { cont.innerHTML = '<div class="loading">Todavía no hay clientes cargados.</div>'; return; }
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Cliente</th><th class="no-movil">CUIT</th><th class="no-movil">Condición IVA</th><th class="no-movil">Teléfono</th><th>Plazo</th><th style="width:96px"></th></tr></thead><tbody>';
+  _ccClientes.forEach(function(c, i) {
+    html += '<tr' + (c.activo ? '' : ' style="opacity:.55"') + '><td class="celda-prov" style="font-weight:600;color:var(--verde)">' + ccEsc(c.nombre) + (c.activo ? '' : ' <span style="font-size:9px">(inactivo)</span>') +
+      '<div class="solo-movil" style="font-size:10px;color:#8a7a5a;font-weight:400">' + ccEsc([c.cuit, c.telefono].filter(Boolean).join(' · ')) + '</div></td>' +
+      '<td class="no-movil">' + ccEsc(c.cuit || '—') + '</td><td class="no-movil">' + ccEsc(c.condicionIva || '—') + '</td><td class="no-movil">' + ccEsc(c.telefono || '—') + '</td>' +
+      '<td>' + (c.aPlazo ? c.diasPlazo + ' días' : 'Contado') + '</td>' +
+      '<td class="celda-acc" style="white-space:nowrap"><button onclick="ccEditarCliente(' + i + ')" style="background:#f2f7e8;border:none;border-radius:5px;color:var(--verde);cursor:pointer;padding:3px 8px;font-size:13px;margin-right:4px" title="Editar">✏</button>' +
+      '<button onclick="ccActivarCliente(' + i + ',' + (!c.activo) + ')" style="background:' + (c.activo ? '#fff0f0' : '#e8f0c8') + ';border:none;border-radius:5px;color:' + (c.activo ? 'var(--rojo)' : 'var(--oliva)') + ';cursor:pointer;padding:3px 8px;font-size:12px" title="' + (c.activo ? 'Dar de baja' : 'Reactivar') + '">' + (c.activo ? '⏸' : '▶') + '</button></td></tr>';
+  });
+  html += '</tbody></table></div><div style="font-size:11px;color:#8a7a5a;margin-top:8px">Un cliente dado de baja no aparece para nuevas ventas, pero conserva su cuenta corriente.</div>';
+  cont.innerHTML = html;
+}
+
+function ccLimpiarCliente() {
+  _ccEditCliente = null;
+  ['cl-nombre', 'cl-cuit', 'cl-contacto', 'cl-telefono', 'cl-email', 'cl-direccion', 'cl-notas'].forEach(function(id) { document.getElementById(id).value = ''; });
+  document.getElementById('cl-iva').value = 'Responsable Inscripto';
+  document.getElementById('cl-aplazo').checked = false; document.getElementById('cl-dias').value = '';
+  document.getElementById('cl-dias-wrap').style.display = 'none';
+  document.getElementById('cl-nombre').readOnly = false;
+  document.getElementById('cl-form-titulo').textContent = 'Nuevo cliente mayorista';
+  document.getElementById('cl-cancelar').style.display = 'none';
+}
+
+function ccEditarCliente(i) {
+  var c = _ccClientes[i]; if (!c) return;
+  _ccEditCliente = c;
+  var set = function(id, v) { document.getElementById(id).value = v || ''; };
+  set('cl-nombre', c.nombre); set('cl-cuit', c.cuit); set('cl-contacto', c.contacto); set('cl-telefono', c.telefono);
+  set('cl-email', c.email); set('cl-direccion', c.direccion); set('cl-notas', c.notas);
+  document.getElementById('cl-iva').value = c.condicionIva || 'Responsable Inscripto';
+  document.getElementById('cl-aplazo').checked = c.aPlazo; set('cl-dias', c.aPlazo ? c.diasPlazo : '');
+  document.getElementById('cl-dias-wrap').style.display = c.aPlazo ? '' : 'none';
+  document.getElementById('cl-nombre').readOnly = true;
+  document.getElementById('cl-form-titulo').textContent = 'Editar cliente: ' + c.nombre;
+  document.getElementById('cl-cancelar').style.display = '';
+  document.getElementById('cl-form-titulo').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function ccGuardarCliente() {
+  var v = function(id) { return document.getElementById(id).value.trim(); };
+  var data = { nombre: v('cl-nombre'), cuit: v('cl-cuit'), condicionIva: v('cl-iva'), contacto: v('cl-contacto'), telefono: v('cl-telefono'),
+               email: v('cl-email'), direccion: v('cl-direccion'), notas: v('cl-notas'), aPlazo: document.getElementById('cl-aplazo').checked,
+               diasPlazo: parseInt(v('cl-dias'), 10) || 0 };
+  if (_ccEditCliente) { data.id = _ccEditCliente.id; data.activo = _ccEditCliente.activo; }
+  if (!data.nombre) return toast('El nombre es obligatorio', false);
+  if (data.aPlazo && !(data.diasPlazo > 0)) return toast('Indicá los días de plazo', false);
+  apiPost('guardarCliente', data).then(function(r) {
+    if (!r.ok) return toast('Error: ' + (r.msg || r.error || ''), false);
+    toast(_ccEditCliente ? 'Cliente actualizado ✓' : 'Cliente agregado ✓');
+    ccLimpiarCliente();
+    ccCargarListas().then(ccRenderClientes);
+  }).catch(function(e) { toast('Error: ' + e.message, false); });
+}
+
+function ccActivarCliente(i, activo) {
+  var c = _ccClientes[i]; if (!c) return;
+  if (!activo && !confirm('¿Dar de baja a ' + c.nombre + '? No va a aparecer para nuevas ventas, pero conserva su cuenta corriente.')) return;
+  var data = Object.assign({}, c, { activo: activo });
+  apiPost('guardarCliente', data).then(function(r) {
+    if (!r.ok) return toast('Error: ' + (r.msg || r.error || ''), false);
+    toast(activo ? 'Cliente reactivado ✓' : 'Cliente dado de baja ✓');
+    ccCargarListas().then(ccRenderClientes);
+  }).catch(function(e) { toast('Error: ' + e.message, false); });
+}
+
+// ---------- Venta manual mayorista ----------
+function mEsMayorista() {
+  var sel = document.getElementById('m-plataforma');
+  var txt = sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+  return /mayorist/i.test(txt);
+}
+function mActualizarMayorista() {
+  var es = mEsMayorista();
+  document.getElementById('m-mayorista-section').style.display = es ? '' : 'none';
+  if (es && !_ccClientes.length) apiGet('clientes').then(function(c) { _ccClientes = c || []; mLlenarClientes(); });
+  else if (es) mLlenarClientes();
+}
+function mLlenarClientes(seleccionar) {
+  var sel = document.getElementById('m-cliente'), prev = seleccionar || sel.value;
+  var act = _ccClientes.filter(function(c) { return c.activo; });
+  sel.innerHTML = '<option value="">— Elegí el cliente —</option>' + act.map(function(c) { return '<option value="' + ccEsc(c.nombre) + '">' + ccEsc(c.nombre) + '</option>'; }).join('');
+  if (act.some(function(c) { return c.nombre === prev; })) sel.value = prev;
+  mOnCliente();
+}
+function mOnCliente() {
+  var c = _ccClientes.filter(function(x) { return x.nombre === document.getElementById('m-cliente').value; })[0];
+  var chk = document.getElementById('m-aplazo');
+  if (c && !chk.dataset.tocado) chk.checked = !!c.aPlazo;
+  mOnAPlazo();
+}
+function mOnAPlazo() {
+  var on = document.getElementById('m-aplazo').checked;
+  document.getElementById('m-venc-wrap').style.display = on ? '' : 'none';
+  var c = _ccClientes.filter(function(x) { return x.nombre === document.getElementById('m-cliente').value; })[0];
+  var venc = document.getElementById('m-vencimiento');
+  if (on && !venc.dataset.tocado) venc.value = ccSumarDias(document.getElementById('m-fecha').value, c && c.aPlazo ? c.diasPlazo : 0);
+}
+function mResetMayorista() {
+  ['m-cliente', 'm-comprobante', 'm-vencimiento'].forEach(function(id) { var el = document.getElementById(id); el.value = ''; delete el.dataset.tocado; });
+  var chk = document.getElementById('m-aplazo'); chk.checked = false; delete chk.dataset.tocado;
+  mActualizarMayorista();
+}
+function mNuevoClienteRapido() {
+  var nombre = (prompt('Nombre del nuevo cliente mayorista:') || '').trim();
+  if (!nombre) return;
+  apiPost('guardarCliente', { nombre: nombre }).then(function(r) {
+    if (!r.ok) return toast('Error: ' + (r.msg || r.error || ''), false);
+    toast('Cliente agregado ✓ (completá sus datos en Cuentas corrientes)');
+    apiGet('clientes').then(function(c) { _ccClientes = c || []; mLlenarClientes(r.nombre); });
+  }).catch(function(e) { toast('Error: ' + e.message, false); });
+}
+// Completa los datos de la venta; devuelve false si falta algo.
+function mAgregarDatosMayorista(data) {
+  if (!mEsMayorista()) return true;
+  var cliente = document.getElementById('m-cliente').value;
+  if (!cliente) { toast('Elegí el cliente mayorista', false); return false; }
+  data.cliente = cliente;
+  data.comprobante = document.getElementById('m-comprobante').value.trim();
+  data.aPlazo = document.getElementById('m-aplazo').checked;
+  data.vencimiento = data.aPlazo ? document.getElementById('m-vencimiento').value : '';
+  return true;
+}
+
+// ---------- Compra a plazo ----------
+function gOnAPlazo() {
+  var on = document.getElementById('g-aplazo').checked;
+  document.getElementById('g-venc-wrap').style.display = on ? '' : 'none';
 }
 
 // TOAST

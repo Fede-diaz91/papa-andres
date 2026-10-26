@@ -46,7 +46,10 @@ function doGet(e) {
     else if (action === 'insumos')          result = getInsumos();
     else if (action === 'subrecetas')       result = getSubrecetasCompleto();
     else if (action === 'parametrosVenta')  result = getParametrosVenta();
-    else result = { ok: true, msg: 'Papá Andrés API v2.5' };
+    else if (action === 'clientes')         result = getClientes(e.parameter.activos === '1');
+    else if (action === 'ctaCteResumen')    result = getCtaCteResumen(e.parameter.tipo);
+    else if (action === 'ctaCteMovimientos') result = getCtaCteMovimientos(e.parameter.tipo, e.parameter.tercero);
+    else result = { ok: true, msg: 'Papá Andrés API v2.6' };
 
     return _json(result);
   } catch(err) {
@@ -90,7 +93,7 @@ function doPost(e) {
     else if (action === 'eliminarEnvio')           result = eliminarFila('Envíos', data.rowIndex);
     else if (action === 'eliminarBienDeUso')       result = eliminarFila('BienesDeUso', data.rowIndex);
     else if (action === 'eliminarAlquiler')        result = eliminarFila('Alquiler', data.rowIndex);
-    else if (action === 'eliminarVentaDia')        result = eliminarFila('DatosDia', data.rowIndex);
+    else if (action === 'eliminarVentaDia')        result = eliminarVentaDia(data);
     else if (action === 'eliminarVentaProducto')   result = eliminarFila('DatosProductos', data.rowIndex);
     else if (action === 'altaEmpleado')            result = altaEmpleado(data);
     else if (action === 'bajaEmpleado')            result = bajaEmpleado(data.id);
@@ -109,6 +112,9 @@ function doPost(e) {
     else if (action === 'agregarSubreceta')         result = agregarSubreceta(data);
     else if (action === 'guardarParametrosVenta')   result = guardarParametrosVenta(data);
     else if (action === 'guardarPreciosVenta')      result = guardarPreciosVenta(data);
+    else if (action === 'guardarCliente')           result = guardarCliente(data);
+    else if (action === 'registrarMovimientoCC')    result = registrarMovimientoCC(data);
+    else if (action === 'eliminarMovimientoCC')     result = eliminarMovimientoCC(data);
     else result = { ok: false, msg: 'Acción no reconocida: ' + action };
 
     return _json(result);
@@ -465,6 +471,7 @@ function registrarCompraFactura(data) {
       var check = verificarComprobante(data.comprobante, data.proveedor);
       if (check.duplicado) return { ok: false, duplicado: true, msg: 'El comprobante "' + data.comprobante + '" ya está registrado para este proveedor.' };
     }
+    if (data.aPlazo && !String(data.proveedor || '').trim()) return { ok: false, msg: 'Para cargar una compra a plazo elegí el proveedor' };
     var sheet = getSpreadsheet().getSheetByName('Compras');
     var rows = items.map(function(it) {
       return [data.fecha, data.proveedor || '', String(it.insumo).trim().toUpperCase(), it.unidad || '',
@@ -473,7 +480,9 @@ function registrarCompraFactura(data) {
         parseFloat(it.percepcionIVA) || 0, parseFloat(it.percepcionIIBB) || 0, parseFloat(it.percepcionGanancias) || 0,
         data.comprobante || '', it.notas || data.notas || ''];
     });
-    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    var primera = sheet.getLastRow() + 1;
+    sheet.getRange(primera, 1, rows.length, rows[0].length).setValues(rows);
+    if (data.aPlazo) _ccMarcarCompra(sheet, primera, rows.length, _ccCompraAPlazo(data, rows));
     return { ok: true, count: rows.length };
   });
 }
@@ -559,9 +568,14 @@ function editarCompraFactura(data) {
         parseFloat(it.percepcionIVA) || 0, parseFloat(it.percepcionIIBB) || 0, parseFloat(it.percepcionGanancias) || 0,
         data.comprobante || '', it.notas || data.notas || ''];
     });
+    if (data.aPlazo && !String(data.proveedor || '').trim()) return { ok: false, msg: 'Para cargar una compra a plazo elegí el proveedor' };
+    var refsViejas = _ccRefsCompra(sheet, val.filas);
     // Primero se agregan las líneas nuevas y después se borran las viejas: si algo falla en el medio, no se pierde la compra.
-    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    var primera = sheet.getLastRow() + 1;
+    sheet.getRange(primera, 1, rows.length, rows[0].length).setValues(rows);
+    if (data.aPlazo) _ccMarcarCompra(sheet, primera, rows.length, _ccCompraAPlazo(data, rows));
     _cmpBorrarFilas(sheet, val.filas);
+    refsViejas.forEach(function(r) { _ccBorrarPorOrigen('COMPRA:' + r); });
     return { ok: true, count: rows.length };
   });
 }
@@ -572,7 +586,9 @@ function eliminarCompraFactura(data) {
     if (!sheet) return { ok: false, msg: 'Hoja Compras no encontrada' };
     var val = _cmpValidarOriginal(sheet, data.original);
     if (!val.ok) return val;
+    var refs = _ccRefsCompra(sheet, val.filas);
     _cmpBorrarFilas(sheet, val.filas);
+    refs.forEach(function(r) { _ccBorrarPorOrigen('COMPRA:' + r); });
     return { ok: true, count: val.filas.length };
   });
 }
@@ -860,12 +876,16 @@ function borrarVentas(data) {
       var sDia = ss.getSheetByName('DatosDia');
       if (sDia) {
         _vAsegurarDia(sDia);
+        var refsBorradas = [];
         res.borradasDia = _vReescribir(sDia, function(r) {
           var coincide = _vEsDelPeriodoDia(r, mesN, anioN)
             && (!canal  || String(r[2] || '').trim().toLowerCase() === canal)
             && (!origen || String(r[V_COL_ORIGEN_DIA - 1] || '').trim() === origen);
+          if (coincide) refsBorradas = refsBorradas.concat(_ccRefsVentasDia([r]));
           return !coincide;
         });
+        refsBorradas.forEach(function(x) { _ccBorrarPorOrigen('VENTA:' + x); });
+        res.ctaCte = refsBorradas.length;
       }
     }
     if (tipo === 'ventasProductos' || tipo === 'ambos') {
@@ -904,9 +924,22 @@ function registrarVentaManual(data) {
     var totalItems = items.reduce(function(s, it){ return s + (parseFloat(it.subtotal) || 0); }, 0);
     var desc = parseFloat(data.descuentos) || 0;
     var totalNeto = totalItems - desc;
-    sheetDia.getRange(sheetDia.getLastRow() + 1, 1, 1, V_COL_ANIO_DIA).setValues([[
-      mesCap, data.fecha, data.plataforma || 'Manual', data.metodo || 'Efectivo', 1, desc, totalNeto, totalNeto, V_ORIGEN_MANUAL, anioN
-    ]]);
+    var cliente = String(data.cliente || '').trim();
+    if (data.aPlazo && !cliente) return { ok:false, msg:'Para una venta a plazo elegí el cliente' };
+    if (data.aPlazo && !(totalNeto > 0)) return { ok:false, msg:'El total de la venta tiene que ser mayor a cero' };
+    var ref = '';
+    if (data.aPlazo) {
+      ref = _ccId('V');
+      _ccAgregar({ fecha: data.fecha, tipo: 'CLIENTE', tercero: cliente, concepto: 'VENTA', comprobante: data.comprobante || '',
+                   debe: totalNeto, haber: 0, vencimiento: data.vencimiento, origen: 'VENTA:' + ref, notas: '' });
+    }
+    var filaDia = [mesCap, data.fecha, data.plataforma || 'Manual', data.metodo || 'Efectivo', 1, desc, totalNeto, totalNeto, V_ORIGEN_MANUAL, anioN];
+    if (cliente || ref) {
+      _ccAsegurarCol(sheetDia, VD_COL_CLIENTE, 'Cliente');
+      _ccAsegurarCol(sheetDia, VD_COL_CTACTE, 'CtaCte');
+      filaDia.push(cliente, ref);
+    }
+    sheetDia.getRange(sheetDia.getLastRow() + 1, 1, 1, filaDia.length).setValues([filaDia]);
     var rowsProd = items.filter(function(it){ return it.producto && String(it.producto).trim(); }).map(function(it) {
       return [mesCap, String(it.producto).trim(), parseFloat(it.cantidad) || 1, parseFloat(it.subtotal) || 0, V_ORIGEN_MANUAL, anioN];
     });
@@ -1754,4 +1787,271 @@ function normalizarRecetas() {
     }
   }
   Logger.log('✅ ' + corregidos + ' nombres corregidos en Recetas.');
+}
+
+// ============================================================
+// CLIENTES MAYORISTAS Y CUENTAS CORRIENTES
+// Hoja Clientes: ID | Nombre | CUIT | CondicionIVA | Contacto | Telefono | Email | Direccion | APlazo | DiasPlazo | Activo | Notas | Alta
+// Hoja CuentasCorrientes: un movimiento por fila.
+//   Cliente:   Debe = aumenta lo que nos debe (venta, saldo inicial)  · Haber = cobro.   Saldo = Debe − Haber
+//   Proveedor: Haber = aumenta lo que le debemos (compra, saldo inicial) · Debe = pago.  Saldo = Haber − Debe
+//   Origen: vacío = cargado a mano · "VENTA:<ref>" / "COMPRA:<ref>" = generado por una venta manual o una compra
+// ============================================================
+var CL_HEADERS = ['ID', 'Nombre', 'CUIT', 'CondicionIVA', 'Contacto', 'Telefono', 'Email', 'Direccion', 'APlazo', 'DiasPlazo', 'Activo', 'Notas', 'Alta'];
+var CC_HEADERS = ['ID', 'Fecha', 'Tipo', 'Tercero', 'Concepto', 'Comprobante', 'Debe', 'Haber', 'Medio', 'Vencimiento', 'Origen', 'Notas', 'Registrado'];
+var CC_COL_ORIGEN = 11;
+var CC_TZ = 'America/Argentina/Buenos_Aires';
+// Columnas agregadas a hojas existentes para el vínculo con la cuenta corriente
+var CMP_COL_CTACTE = 16, CMP_COL_VENC = 17;   // Compras: P = referencia, Q = vencimiento
+var VD_COL_CLIENTE = 11, VD_COL_CTACTE = 12;  // DatosDia: K = cliente, L = referencia
+
+function _ccHojaClientes() { return _pvHoja('Clientes', CL_HEADERS, []); }
+function _ccHojaMov() { return _pvHoja('CuentasCorrientes', CC_HEADERS, []); }
+function _ccAsegurarCol(sheet, col, nombre) {
+  var h = String(sheet.getRange(1, col).getValue() || '').trim();
+  if (h === nombre) return;
+  if (h) throw new Error('La hoja ' + sheet.getName() + ' ya tiene otra columna en la posición ' + col + ': ' + h);
+  sheet.getRange(1, col).setValue(nombre);
+}
+function _ccId(prefijo) { return prefijo + Utilities.formatDate(new Date(), CC_TZ, 'yyMMddHHmmss') + Math.floor(Math.random() * 900 + 100); }
+// Acepta Date, 'AAAA-MM-DD' o 'DD/MM/AAAA'; devuelve Date (00:00 local) o null
+function _ccFecha(v) {
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : new Date(v.getFullYear(), v.getMonth(), v.getDate());
+  var s = String(v || '').trim(), m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return new Date(+m[1], +m[2] - 1, +m[3]);
+  if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return new Date(+m[3], +m[2] - 1, +m[1]);
+  return null;
+}
+function _ccTxt(d) { return d ? Utilities.formatDate(d, CC_TZ, 'dd/MM/yyyy') : ''; }
+function _ccNorm(v) { return String(v || '').trim().toUpperCase(); }
+function _ccNum(v) { var n = parseFloat(v); return isNaN(n) ? 0 : Math.round(n * 100) / 100; }
+
+// ---------- Clientes ----------
+function getClientes(soloActivos) {
+  var sh = getSpreadsheet().getSheetByName('Clientes');
+  if (!sh || sh.getLastRow() <= 1) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, CL_HEADERS.length).getValues()
+    .filter(function(r) { return String(r[1] || '').trim(); })
+    .map(function(r) {
+      return { id: String(r[0]), nombre: String(r[1]).trim(), cuit: String(r[2] || ''), condicionIva: String(r[3] || ''),
+               contacto: String(r[4] || ''), telefono: String(r[5] || ''), email: String(r[6] || ''), direccion: String(r[7] || ''),
+               aPlazo: _ccNorm(r[8]) === 'SI', diasPlazo: parseInt(r[9], 10) || 0, activo: _ccNorm(r[10]) !== 'NO',
+               notas: String(r[11] || '') };
+    })
+    .filter(function(c) { return !soloActivos || c.activo; })
+    .sort(function(a, b) { return a.nombre.localeCompare(b.nombre, 'es'); });
+}
+
+// Alta (sin id) o edición (con id). El nombre identifica al cliente en ventas y cuenta corriente: no se cambia al editar.
+function guardarCliente(data) {
+  return _vConLock(function() {
+    var sh = _ccHojaClientes();
+    var nombre = String(data.nombre || '').trim();
+    var filas = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow() - 1, CL_HEADERS.length).getValues() : [];
+    var fila = function(id, nom, activo, alta) {
+      return [id, nom, String(data.cuit || '').trim(), String(data.condicionIva || '').trim(), String(data.contacto || '').trim(),
+              String(data.telefono || '').trim(), String(data.email || '').trim(), String(data.direccion || '').trim(),
+              data.aPlazo ? 'SI' : 'NO', parseInt(data.diasPlazo, 10) || 0, activo ? 'SI' : 'NO', String(data.notas || '').trim(), alta];
+    };
+    if (data.id) {
+      for (var i = 0; i < filas.length; i++) {
+        if (String(filas[i][0]) === String(data.id)) {
+          var activo = data.activo === undefined ? _ccNorm(filas[i][10]) !== 'NO' : !!data.activo;
+          sh.getRange(i + 2, 1, 1, CL_HEADERS.length).setValues([fila(filas[i][0], filas[i][1], activo, filas[i][12])]);
+          return { ok: true, id: String(filas[i][0]), nombre: String(filas[i][1]) };
+        }
+      }
+      return { ok: false, msg: 'Cliente no encontrado' };
+    }
+    if (!nombre) return { ok: false, msg: 'El nombre es obligatorio' };
+    if (filas.some(function(r) { return _ccNorm(r[1]) === _ccNorm(nombre); })) return { ok: false, msg: 'Ya existe un cliente con ese nombre' };
+    var id = _ccId('CL');
+    sh.getRange(sh.getLastRow() + 1, 1, 1, CL_HEADERS.length).setValues([fila(id, nombre, true, new Date())]);
+    return { ok: true, id: id, nombre: nombre };
+  });
+}
+
+// ---------- Movimientos ----------
+function _ccLeerMov() {
+  var sh = getSpreadsheet().getSheetByName('CuentasCorrientes');
+  if (!sh || sh.getLastRow() <= 1) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, CC_HEADERS.length).getValues().map(function(r, i) {
+    return { fila: i + 2, id: String(r[0]), fecha: _ccFecha(r[1]), tipo: _ccNorm(r[2]), tercero: String(r[3] || '').trim(),
+             concepto: _ccNorm(r[4]), comprobante: String(r[5] || ''), debe: _ccNum(r[6]), haber: _ccNum(r[7]),
+             medio: String(r[8] || ''), vencimiento: _ccFecha(r[9]), origen: String(r[10] || ''), notas: String(r[11] || '') };
+  }).filter(function(m) { return m.id && m.tercero; });
+}
+
+// Agrega un movimiento (sin lock: la función que llama ya lo tiene)
+function _ccAgregar(m) {
+  var sh = _ccHojaMov();
+  var id = _ccId('MV');
+  sh.getRange(sh.getLastRow() + 1, 1, 1, CC_HEADERS.length).setValues([[
+    id, _ccFecha(m.fecha), m.tipo, String(m.tercero).trim(), m.concepto, m.comprobante || '',
+    _ccNum(m.debe), _ccNum(m.haber), m.medio || '', _ccFecha(m.vencimiento) || '', m.origen || '', m.notas || '', new Date()]]);
+  sh.getRange(sh.getLastRow(), 2).setNumberFormat('dd/MM/yyyy');
+  if (m.vencimiento) sh.getRange(sh.getLastRow(), 10).setNumberFormat('dd/MM/yyyy');
+  return id;
+}
+
+// Borra los movimientos generados por un origen (sin lock)
+function _ccBorrarPorOrigen(origen) {
+  if (!origen) return 0;
+  var sh = getSpreadsheet().getSheetByName('CuentasCorrientes');
+  if (!sh || sh.getLastRow() <= 1) return 0;
+  var vals = sh.getRange(2, CC_COL_ORIGEN, sh.getLastRow() - 1, 1).getValues();
+  var n = 0;
+  for (var i = vals.length - 1; i >= 0; i--) if (String(vals[i][0]) === origen) { sh.deleteRow(i + 2); n++; }
+  return n;
+}
+
+var CC_CONCEPTOS_MANUALES = ['SALDO_INICIAL', 'COBRO', 'PAGO', 'AJUSTE'];
+
+// data: { tipo: CLIENTE|PROVEEDOR, tercero, concepto: SALDO_INICIAL|COBRO|PAGO|AJUSTE, fecha, importe,
+//         sentido: AUMENTA|DISMINUYE (saldo inicial y ajuste), medio, comprobante, vencimiento, notas }
+function registrarMovimientoCC(data) {
+  var tipo = _ccNorm(data.tipo), concepto = _ccNorm(data.concepto);
+  if (tipo !== 'CLIENTE' && tipo !== 'PROVEEDOR') return { ok: false, msg: 'Tipo de cuenta inválido' };
+  if (CC_CONCEPTOS_MANUALES.indexOf(concepto) < 0) return { ok: false, msg: 'Movimiento inválido' };
+  if (concepto === 'COBRO' && tipo !== 'CLIENTE') return { ok: false, msg: 'Los cobros son de clientes' };
+  if (concepto === 'PAGO' && tipo !== 'PROVEEDOR') return { ok: false, msg: 'Los pagos son a proveedores' };
+  var tercero = String(data.tercero || '').trim();
+  if (!tercero) return { ok: false, msg: 'Elegí el ' + (tipo === 'CLIENTE' ? 'cliente' : 'proveedor') };
+  var fecha = _ccFecha(data.fecha);
+  if (!fecha) return { ok: false, msg: 'Fecha inválida' };
+  var importe = _ccNum(data.importe);
+  if (!(importe > 0)) return { ok: false, msg: 'El importe tiene que ser mayor a cero' };
+  var aumenta = concepto === 'COBRO' || concepto === 'PAGO' ? false : _ccNorm(data.sentido) !== 'DISMINUYE';
+  // Cliente: aumenta → Debe.  Proveedor: aumenta → Haber.
+  var alDebe = tipo === 'CLIENTE' ? aumenta : !aumenta;
+  return _vConLock(function() {
+    var id = _ccAgregar({ fecha: fecha, tipo: tipo, tercero: tercero, concepto: concepto, comprobante: data.comprobante,
+      debe: alDebe ? importe : 0, haber: alDebe ? 0 : importe, medio: data.medio, vencimiento: data.vencimiento, notas: data.notas });
+    return { ok: true, id: id };
+  });
+}
+
+// Solo se borran los movimientos cargados a mano; los de ventas y compras se corrigen desde su origen.
+function eliminarMovimientoCC(data) {
+  return _vConLock(function() {
+    var movs = _ccLeerMov();
+    var m = movs.filter(function(x) { return x.id === String(data.id); })[0];
+    if (!m) return { ok: false, msg: 'Movimiento no encontrado. Recargá la cuenta.' };
+    if (m.origen) return { ok: false, msg: 'Este movimiento viene de una ' + (m.origen.indexOf('VENTA') === 0 ? 'venta' : 'compra') + ': se corrige editando o eliminando esa operación.' };
+    getSpreadsheet().getSheetByName('CuentasCorrientes').deleteRow(m.fila);
+    return { ok: true };
+  });
+}
+
+// Saldo, antigüedad (lo pendiente se calcula aplicando los pagos a lo más viejo primero) y último movimiento.
+function _ccCalcular(movs, tipo, diasPorCliente, hoy) {
+  var signo = function(m) { return tipo === 'CLIENTE' ? m.debe - m.haber : m.haber - m.debe; };
+  var cargos = [], creditos = 0, saldo = 0, ultimo = null;
+  movs.forEach(function(m) {
+    var v = signo(m);
+    saldo += v;
+    if (!ultimo || m.fecha > ultimo) ultimo = m.fecha;
+    if (v > 0) {
+      var venc = m.vencimiento;
+      if (!venc && tipo === 'CLIENTE' && diasPorCliente) { venc = new Date(m.fecha.getTime()); venc.setDate(venc.getDate() + diasPorCliente); }
+      cargos.push({ importe: v, venc: venc || m.fecha, fecha: m.fecha });
+    } else creditos += -v;
+  });
+  cargos.sort(function(a, b) { return (a.venc - b.venc) || (a.fecha - b.fecha); });
+  var b = { alDia: 0, d30: 0, d60: 0, d90: 0, mas90: 0 };
+  cargos.forEach(function(c) {
+    var pendiente = c.importe;
+    var aplica = Math.min(pendiente, creditos);
+    pendiente -= aplica; creditos -= aplica;
+    if (pendiente <= 0.005) return;
+    var dias = Math.floor((hoy - c.venc) / 86400000);
+    if (dias <= 0) b.alDia += pendiente; else if (dias <= 30) b.d30 += pendiente; else if (dias <= 60) b.d60 += pendiente;
+    else if (dias <= 90) b.d90 += pendiente; else b.mas90 += pendiente;
+  });
+  Object.keys(b).forEach(function(k) { b[k] = Math.round(b[k] * 100) / 100; });
+  b.saldo = Math.round(saldo * 100) / 100;
+  b.vencido = Math.round((b.d30 + b.d60 + b.d90 + b.mas90) * 100) / 100;
+  b.ultimoMovimiento = _ccTxt(ultimo);
+  b.movimientos = movs.length;
+  return b;
+}
+
+// tipo: CLIENTE | PROVEEDOR. Incluye a todos los clientes activos / proveedores aunque no tengan movimientos.
+function getCtaCteResumen(tipo) {
+  tipo = _ccNorm(tipo) === 'PROVEEDOR' ? 'PROVEEDOR' : 'CLIENTE';
+  var hoy = new Date(); hoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  var movs = _ccLeerMov().filter(function(m) { return m.tipo === tipo && m.fecha; });
+  var porTercero = {}, nombres = {};
+  movs.forEach(function(m) { var k = _ccNorm(m.tercero); (porTercero[k] = porTercero[k] || []).push(m); nombres[k] = nombres[k] || m.tercero; });
+  var dias = {}, activos = {};
+  if (tipo === 'CLIENTE') getClientes(false).forEach(function(c) { var k = _ccNorm(c.nombre); dias[k] = c.aPlazo ? c.diasPlazo : 0; nombres[k] = c.nombre; activos[k] = c.activo; });
+  else getProveedores().forEach(function(p) { var k = _ccNorm(p.nombre); if (k) { nombres[k] = String(p.nombre).trim(); activos[k] = true; } });
+  var filas = Object.keys(nombres).filter(function(k) { return porTercero[k] || activos[k]; }).map(function(k) {
+    var r = _ccCalcular(porTercero[k] || [], tipo, dias[k] || 0, hoy);
+    r.tercero = nombres[k]; r.activo = activos[k] !== false;
+    return r;
+  });
+  filas.sort(function(a, b) { return (Math.abs(b.saldo) - Math.abs(a.saldo)) || a.tercero.localeCompare(b.tercero, 'es'); });
+  var tot = { saldo: 0, vencido: 0, alDia: 0, d30: 0, d60: 0, d90: 0, mas90: 0 };
+  filas.forEach(function(f) { Object.keys(tot).forEach(function(k) { tot[k] += f[k]; }); });
+  Object.keys(tot).forEach(function(k) { tot[k] = Math.round(tot[k] * 100) / 100; });
+  return { tipo: tipo, filas: filas, totales: tot };
+}
+
+// Movimientos de un tercero con saldo acumulado
+function getCtaCteMovimientos(tipo, tercero) {
+  tipo = _ccNorm(tipo) === 'PROVEEDOR' ? 'PROVEEDOR' : 'CLIENTE';
+  var k = _ccNorm(tercero);
+  var movs = _ccLeerMov().filter(function(m) { return m.tipo === tipo && _ccNorm(m.tercero) === k && m.fecha; });
+  movs.sort(function(a, b) { return (a.fecha - b.fecha) || (a.fila - b.fila); });
+  var saldo = 0;
+  return movs.map(function(m) {
+    saldo += tipo === 'CLIENTE' ? m.debe - m.haber : m.haber - m.debe;
+    return { id: m.id, fecha: _ccTxt(m.fecha), concepto: m.concepto, comprobante: m.comprobante, debe: m.debe, haber: m.haber,
+             saldo: Math.round(saldo * 100) / 100, medio: m.medio, vencimiento: _ccTxt(m.vencimiento), notas: m.notas,
+             automatico: !!m.origen };
+  });
+}
+
+// ---------- Vínculo con compras ----------
+// Si la compra es a plazo, genera el movimiento del proveedor y devuelve la referencia que se graba en sus líneas.
+function _ccCompraAPlazo(data, rows) {
+  if (!data.aPlazo) return { ref: '', venc: '' };
+  var prov = String(data.proveedor || '').trim();
+  if (!prov) throw new Error('Para cargar una compra a plazo elegí el proveedor');
+  var total = rows.reduce(function(s, r) { return s + (parseFloat(r[9]) || 0); }, 0);
+  var ref = _ccId('C');
+  _ccAgregar({ fecha: data.fecha, tipo: 'PROVEEDOR', tercero: prov, concepto: 'COMPRA', comprobante: data.comprobante || '',
+               debe: 0, haber: total, vencimiento: data.vencimiento, origen: 'COMPRA:' + ref, notas: '' });
+  return { ref: ref, venc: _ccFecha(data.vencimiento) || '' };
+}
+function _ccMarcarCompra(sheet, primeraFila, n, cc) {
+  _ccAsegurarCol(sheet, CMP_COL_CTACTE, 'CtaCte');
+  _ccAsegurarCol(sheet, CMP_COL_VENC, 'Vencimiento');
+  var v = []; for (var i = 0; i < n; i++) v.push([cc.ref, cc.venc]);
+  sheet.getRange(primeraFila, CMP_COL_CTACTE, n, 2).setValues(v);
+  if (cc.venc) sheet.getRange(primeraFila, CMP_COL_VENC, n, 1).setNumberFormat('dd/MM/yyyy');
+}
+// Referencias de cuenta corriente de un conjunto de filas de Compras
+function _ccRefsCompra(sheet, filas) {
+  if (sheet.getLastColumn() < CMP_COL_CTACTE) return [];
+  var refs = {};
+  filas.forEach(function(n) { var r = String(sheet.getRange(n, CMP_COL_CTACTE).getValue() || '').trim(); if (r) refs[r] = true; });
+  return Object.keys(refs);
+}
+
+// ---------- Vínculo con ventas manuales ----------
+function _ccRefsVentasDia(rows) {
+  return rows.map(function(r) { return String(r[VD_COL_CTACTE - 1] || '').trim(); }).filter(function(x) { return x; });
+}
+function eliminarVentaDia(data) {
+  return _vConLock(function() {
+    var sh = getSpreadsheet().getSheetByName('DatosDia');
+    var ri = parseInt(data.rowIndex, 10);
+    if (!sh || !ri || ri < 2 || ri > sh.getLastRow()) return { ok: false, msg: 'Fila inválida' };
+    var refs = sh.getLastColumn() >= VD_COL_CTACTE ? _ccRefsVentasDia(sh.getRange(ri, 1, 1, VD_COL_CTACTE).getValues()) : [];
+    sh.deleteRow(ri);
+    refs.forEach(function(r) { _ccBorrarPorOrigen('VENTA:' + r); });
+    return { ok: true, ctaCte: refs.length };
+  });
 }
