@@ -331,7 +331,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
           <div class="imported-banner" id="imported-banner" style="display:none">
             <span class="imported-banner-text" id="imported-banner-text"></span>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-secondary btn-sm" onclick="exportarHTMLVentas()">🖨 Reporte HTML</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportarHTMLVentas()">📄 PDF</button>
               <button class="btn btn-secondary btn-sm" onclick="exportarExcel()">⬇ Excel</button>
               <button class="btn btn-secondary btn-sm" onclick="abrirCargaManual()">+ Carga manual</button>
               <button class="btn btn-danger btn-sm" onclick="borrarMes()">🗑 Borrar importación</button>
@@ -974,7 +974,7 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <select id="er-anio" class="form-input" onchange="erCargar()">
               <option value="2026">2026</option><option value="2027">2027</option><option value="2028">2028</option>
             </select></div>
-          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="erExportarHTML()">🖨 Reporte HTML</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="erExportarHTML()">📄 PDF</button>
           <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="erExportarExcel()">⬇ Excel</button>
         </div>
       </div>
@@ -996,7 +996,11 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
         <div class="card">
           <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
             <span id="cc-titulo-tabla">Saldos</span>
-            <label style="font-size:11px;font-weight:500;text-transform:none;letter-spacing:0;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" id="cc-con-saldo" checked onchange="ccRenderSaldos()"> Solo con saldo</label>
+            <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <label style="font-size:11px;font-weight:500;text-transform:none;letter-spacing:0;display:flex;gap:6px;align-items:center;cursor:pointer;margin-right:6px"><input type="checkbox" id="cc-con-saldo" checked onchange="ccRenderSaldos()"> Solo con saldo</label>
+              <button class="btn btn-secondary btn-sm" onclick="ccSaldosPDF()">📄 PDF</button>
+              <button class="btn btn-secondary btn-sm" onclick="ccSaldosExcel()">⬇ Excel</button>
+            </span>
           </div>
           <div style="margin-bottom:10px;max-width:320px"><input type="text" id="cc-buscar" class="form-input" placeholder="Buscar..." oninput="ccRenderSaldos()"></div>
           <div id="cc-tabla"><div class="loading">Cargando...</div></div>
@@ -1067,7 +1071,8 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
           <div><label class="form-label">Mes</label><select id="pe-mes" class="form-input"></select></div>
           <div><label class="form-label">Año</label><select id="pe-anio" class="form-input"></select></div>
           <button class="btn btn-primary btn-sm" style="align-self:flex-end" onclick="peCargar()">Calcular</button>
-          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="peExportarHTML()">🖨 Reporte HTML</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="peExportarHTML()">📄 PDF</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="peExportarExcel()">⬇ Excel</button>
         </div>
       </div>
       <div id="pe-contenido"><div class="loading">Seleccioná mes y año para calcular el punto de equilibrio.</div></div>
@@ -1094,7 +1099,8 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
             <select id="am-mes" class="form-input" onchange="amCargar()"></select></div>
           <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amCargar()">↺ Actualizar</button>
           <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amAbrirSimulador()">🧮 Simulador</button>
-          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amExportarHTML()">🖨 Reporte HTML</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amExportarHTML()">📄 PDF</button>
+          <button class="btn btn-secondary btn-sm" style="align-self:flex-end" onclick="amExportarExcel()">⬇ Excel</button>
         </div>
       </div>
       <div id="am-contenido"><div class="loading">Cargando análisis marginal...</div></div>
@@ -3606,10 +3612,7 @@ function amExportarHTML() {
     '<div class="footer">Papá Andrés · Análisis Marginal · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
     '</div></body></html>';
 
-  var w = window.open('','_blank');
-  w.document.write(html);
-  w.document.close();
-  toast('Reporte HTML abierto ✓');
+  descargarPDF(html, _nombreArchivo('AnalisisMarginal_' + fechaLocalISO(new Date())), { horizontal: true, ancho: 1150, titulo: 'Papá Andrés · Análisis Marginal' });
 }
 
 // ============================================================
@@ -3965,10 +3968,7 @@ function peExportarHTML() {
     '<div class="footer">Papá Andrés · Sistema de Gestión 2026 · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
     '</div></body></html>';
 
-  var w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  toast('Reporte HTML abierto ✓');
+  descargarPDF(html, _nombreArchivo('PuntoEquilibrio_' + MESES[d.mes] + '_' + d.anio), { ancho: 960, titulo: 'Papá Andrés · Punto de Equilibrio ' + nombreMes });
 }
 
 // ============================================================
@@ -4082,10 +4082,7 @@ function generarHTMLVentas(data, mes, anio) {
     '<div class="footer">Papá Andrés · Sistema de Gestión 2026 · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
     '</div></body></html>';
 
-  var w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  toast('Reporte HTML abierto en nueva pestaña ✓');
+  descargarPDF(html, _nombreArchivo('Ventas_' + MESES[mes] + '_' + anio), { ancho: 960, titulo: 'Papá Andrés · Ventas ' + MESES[mes] + ' ' + anio });
 }
 
 // ============================================================
@@ -4140,7 +4137,8 @@ function erExportarHTML() {
   ];
 
   function tdVal(v, neg, sub, total, resultado, margen, isTotal) {
-    var color = resultado ? (v>=0?'#657a2d':'#d61220') : neg&&!sub&&!total ? '#d61220' : '#233f20';
+    // Filas de fondo oscuro (total y resultado): importes en tonos claros para que se lean
+    var color = resultado ? (v>=0?'#c8dfa0':'#ff9999') : total ? '#ffcccc' : neg&&!sub ? '#d61220' : '#233f20';
     var fw    = (sub||total||resultado) ? '700' : '500';
     var txt   = margen ? fmtP(v) : (v===0&&!isTotal ? '—' : fmt(v));
     return '<td style="padding:6px 10px;text-align:right;font-weight:'+fw+';color:'+color+'">'+txt+'</td>';
@@ -4220,10 +4218,7 @@ function erExportarHTML() {
     '<div class="footer">Papá Andrés · Sistema de Gestión 2026 · Generado '+new Date().toLocaleDateString('es-AR')+'</div>'+
     '</div></body></html>';
 
-  var w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  toast('Reporte HTML abierto en nueva pestaña ✓');
+  descargarPDF(html, _nombreArchivo('EstadoResultados_' + data.anio), { horizontal: true, ancho: 1240, titulo: 'Papá Andrés · Estado de Resultados ' + data.anio });
 }
 
 // ============================================================
@@ -4848,12 +4843,16 @@ function ccCargarDetalle(scroll) {
   document.getElementById('cc-detalle-acciones').innerHTML =
     '<button class="btn btn-primary btn-sm" onclick="ccIrARegistrar(\'' + (esCli ? 'COBRO' : 'PAGO') + '\')">' + (esCli ? '💵 Registrar cobro' : '💵 Registrar pago') + '</button>' +
     '<button class="btn btn-secondary btn-sm" onclick="ccIrARegistrar(\'SALDO_INICIAL\')">Cargar saldo inicial</button>' +
-    '<button class="btn btn-secondary btn-sm" onclick="ccIrARegistrar(\'AJUSTE\')">Ajuste</button>';
+    '<button class="btn btn-secondary btn-sm" onclick="ccIrARegistrar(\'AJUSTE\')">Ajuste</button>' +
+    '<span style="flex:1"></span><button class="btn btn-secondary btn-sm" onclick="ccCuentaPDF()">📄 Resumen PDF</button>' +
+    '<button class="btn btn-secondary btn-sm" onclick="ccCuentaExcel()">⬇ Excel</button>';
   document.getElementById('cc-detalle').innerHTML = '<div class="loading">Cargando movimientos...</div>';
+  _ccMovsActual = null;
   if (scroll) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   apiGet('ctaCteMovimientos', { tipo: tipo, tercero: tercero }).then(function(movs) {
     if (_ccSel !== tercero || _ccVista !== tipo) return;
     movs = movs || [];
+    _ccMovsActual = movs;
     if (!movs.length) { document.getElementById('cc-detalle').innerHTML = '<div class="loading">Sin movimientos. Si tenía un saldo previo, cargalo como saldo inicial.</div>'; return; }
     var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th>Fecha</th><th>Concepto</th><th class="no-movil">Comprobante</th><th class="no-movil">Medio</th>' +
       '<th class="no-movil" style="text-align:right">' + (esCli ? 'Debe (venta)' : 'Debe (pago)') + '</th><th class="no-movil" style="text-align:right">' + (esCli ? 'Haber (cobro)' : 'Haber (compra)') + '</th>' +
@@ -5091,6 +5090,289 @@ function mAgregarDatosMayorista(data) {
 function gOnAPlazo() {
   var on = document.getElementById('g-aplazo').checked;
   document.getElementById('g-venc-wrap').style.display = on ? '' : 'none';
+}
+
+// ============================================================
+// DESCARGA DE REPORTES EN PDF
+// Arma el reporte en un iframe oculto, lo pasa a imagen por página (html2canvas) y lo
+// guarda con jsPDF. Los cortes de página caen entre filas/bloques, no en el medio.
+// ============================================================
+var _pdfLibs = null;
+function _cargarScript(src) {
+  return new Promise(function(res, rej) {
+    var s = document.createElement('script'); s.src = src; s.async = true;
+    s.onload = res; s.onerror = function() { rej(new Error('No se pudo cargar ' + src.split('/').pop() + '. Revisá la conexión.')); };
+    document.head.appendChild(s);
+  });
+}
+function _cargarLibsPDF() {
+  if (window.html2canvas && window.jspdf) return Promise.resolve();
+  if (!_pdfLibs) _pdfLibs = Promise.all([
+    _cargarScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'),
+    _cargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  ]).catch(function(e) { _pdfLibs = null; throw e; });
+  return _pdfLibs;
+}
+
+// opts: { horizontal: bool, ancho: px de diseño del reporte, titulo: texto del pie }
+var _pdfEnCurso = false;
+function descargarPDF(html, nombreArchivo, opts) {
+  opts = opts || {};
+  if (_pdfEnCurso) { toast('Ya se está generando un PDF...', false); return Promise.resolve(); }
+  _pdfEnCurso = true;
+  toast('Generando PDF...');
+  var ancho = opts.ancho || (opts.horizontal ? 1240 : 900);
+  var ifr = document.createElement('iframe');
+  ifr.setAttribute('aria-hidden', 'true');
+  ifr.style.cssText = 'position:fixed;left:-20000px;top:0;width:' + ancho + 'px;height:1200px;border:0;background:#fff';
+  document.body.appendChild(ifr);
+  var limpiar = function() { _pdfEnCurso = false; if (ifr.parentNode) ifr.parentNode.removeChild(ifr); };
+  return _cargarLibsPDF().then(function() {
+    var doc = ifr.contentDocument;
+    doc.open(); doc.write(html); doc.close();
+    var st = doc.createElement('style');
+    st.textContent = 'html,body{background:#fff!important}body{padding:14px!important;-webkit-print-color-adjust:exact}' +
+      '.card,.g-tabla-wrap,[style*="overflow-x"]{overflow:visible!important}.no-pdf,button{display:none!important}' +
+      '.page{max-width:none!important;margin:0!important}';
+    doc.head.appendChild(st);
+    return new Promise(function(r) { setTimeout(r, 350); }).then(function() { return doc.fonts && doc.fonts.ready; }).then(function() {
+      // Si el contenido (ej. una tabla de 12 meses) es más ancho que la hoja, se amplía el ancho de diseño
+      // y se achica todo en proporción, para que no se corte nada a la derecha.
+      var real = Math.ceil(Math.max(doc.documentElement.scrollWidth, doc.body.scrollWidth));
+      if (real > ancho + 2) { ancho = real + 16; ifr.style.width = ancho + 'px'; }
+      ifr.style.height = '40px'; // con el marco chico, scrollHeight da el alto real del contenido
+      return new Promise(function(r) { setTimeout(r, 120); });
+    }).then(function() {
+      var H = Math.ceil(Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight));
+      ifr.style.height = H + 'px';
+      var JsPDF = window.jspdf.jsPDF;
+      var pdf = new JsPDF({ orientation: opts.horizontal ? 'landscape' : 'portrait', unit: 'mm', format: 'a4', compress: true });
+      var pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight(), m = 9;
+      var mmPorPx = (pw - 2 * m) / ancho;
+      var altoPag = Math.floor((ph - 2 * m - 5) / mmPorPx); // 5 mm para el pie
+      // Posibles cortes: bordes de filas y bloques
+      var cortes = {};
+      doc.querySelectorAll('tr,.card,.kpi-grid,.kpi,.header,.footer,.nota,h1,h2,h3,p,svg,table,.seccion,.bloque').forEach(function(el) {
+        var r = el.getBoundingClientRect();
+        cortes[Math.round(r.top)] = 1; cortes[Math.round(r.bottom)] = 1;
+      });
+      var lista = Object.keys(cortes).map(Number).sort(function(a, b) { return a - b; });
+      var paginas = [], y = 0;
+      while (y < H - 40) { // un resto de menos de 40 px es solo margen: no genera página
+        var lim = y + altoPag;
+        if (lim >= H) { paginas.push([y, H]); break; }
+        var cand = lista.filter(function(v) { return v > y + altoPag * 0.45 && v <= lim; });
+        var fin = cand.length ? cand[cand.length - 1] : lim;
+        paginas.push([y, fin]); y = fin;
+      }
+      var escala = Math.min(2, Math.max(1.5, window.devicePixelRatio || 1));
+      var fecha = new Date();
+      var pie = (opts.titulo || 'Papá Andrés') + ' · generado ' + fecha.toLocaleDateString('es-AR') + ' ' + fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      var i = 0;
+      var siguiente = function() {
+        if (i >= paginas.length) return Promise.resolve();
+        var p = paginas[i];
+        return window.html2canvas(doc.body, { x: 0, y: p[0], width: ancho, height: p[1] - p[0], windowWidth: ancho, windowHeight: H,
+          scrollX: 0, scrollY: 0, scale: escala, backgroundColor: '#ffffff', logging: false, useCORS: true })
+          .then(function(canvas) {
+            if (i > 0) pdf.addPage();
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', m, m, ancho * mmPorPx, (p[1] - p[0]) * mmPorPx, undefined, 'FAST');
+            pdf.setFontSize(7); pdf.setTextColor(138, 122, 90);
+            pdf.text(pie, m, ph - 5);
+            pdf.text('Página ' + (i + 1) + ' de ' + paginas.length, pw - m, ph - 5, { align: 'right' });
+            i++;
+            return siguiente();
+          });
+      };
+      return siguiente().then(function() { return _entregarPDF(pdf, nombreArchivo); });
+    });
+  }).then(function() { limpiar(); }).catch(function(e) { limpiar(); toast('No se pudo generar el PDF: ' + e.message, false); });
+}
+
+// En el celular abre el menú de compartir (WhatsApp, Archivos...); en la PC lo descarga.
+function _entregarPDF(pdf, nombre) {
+  var esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (esMovil && navigator.canShare && window.File) {
+    try {
+      var file = new File([pdf.output('blob')], nombre, { type: 'application/pdf' });
+      if (navigator.canShare({ files: [file] })) {
+        return navigator.share({ files: [file], title: nombre }).then(function() { toast('PDF listo ✓'); })
+          .catch(function(err) { if (err && err.name === 'AbortError') return; pdf.save(nombre); toast('PDF descargado ✓'); });
+      }
+    } catch (e) { /* si falla compartir, se descarga */ }
+  }
+  pdf.save(nombre);
+  toast('PDF descargado ✓');
+}
+
+function _nombreArchivo(base) { return ('PapaAndres_' + base).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_') + '.pdf'; }
+
+// Plantilla simple para reportes nuevos (cuentas corrientes)
+function _reporteHTML(titulo, subtitulo, cuerpo) {
+  return '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>' + titulo + '</title><style>' +
+    '*{margin:0;padding:0;box-sizing:border-box}body{font-family:Poppins,"Segoe UI",sans-serif;color:#1a1a1a;padding:18px;font-size:12px}' +
+    '.header{background:#233f20;color:#fcebca;border-radius:12px;padding:16px 22px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}' +
+    '.header .t1{font-size:11px;opacity:.7;letter-spacing:.8px;text-transform:uppercase}.header .t2{font-size:19px;font-weight:700;margin-top:2px}' +
+    '.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.kpi{border:1px solid #e8d9b8;border-radius:10px;padding:10px 14px}' +
+    '.kpi-label{font-size:9px;font-weight:600;color:#8a7a5a;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}.kpi-value{font-size:16px;font-weight:700;color:#233f20}' +
+    'table{width:100%;border-collapse:collapse;font-size:11px}th{background:#233f20;color:#fcebca;padding:7px 8px;text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.4px}' +
+    'td{padding:6px 8px;border-bottom:1px solid #f0e4cc}td.n,th.n{text-align:right}tr.tot td{font-weight:700;background:#f5f0e8;border-top:1.5px solid #233f20}' +
+    '.nota{font-size:10px;color:#8a7a5a;margin-top:10px;line-height:1.5}</style></head><body>' +
+    '<div class="header"><div><div class="t1">🍕 Papá Andrés</div><div class="t2">' + titulo + '</div></div><div style="text-align:right;font-size:11px;opacity:.85">' + subtitulo + '</div></div>' +
+    cuerpo + '</body></html>';
+}
+
+// ---------- Excel: Análisis marginal ----------
+function amExportarExcel() {
+  if (!_amData || !_amData.productos) { toast('Primero cargá el reporte', false); return; }
+  var rubro = document.getElementById('am-rubro').value, orden = document.getElementById('am-orden').value;
+  var lista = _amData.productos.filter(function(p) { return !rubro || p.rubro === rubro; });
+  lista.sort(function(a, b) { return orden === 'costoCalculado' ? a[orden] - b[orden] : b[orden] - a[orden]; });
+  if (!lista.length) { toast('No hay productos para exportar', false); return; }
+  var cols = ['#', 'Producto', 'Rubro', 'Precio venta (final)', 'Precio neto de IVA', 'Costo', 'Margen $', 'Margen %', 'Incidencia costo %', 'Objetivo %', 'Origen del precio'];
+  var filas = [[xlCell('🍕 PAPÁ ANDRÉS — ANÁLISIS MARGINAL', { title: true, fontColor: XL_CREMA })].concat(cols.slice(1).map(function() { return xlCell('', { title: true }); })),
+    [xlCell('Generado ' + new Date().toLocaleDateString('es-AR') + (rubro ? ' · Rubro: ' + rubro : ''), { bold: true, fontColor: XL_GRIS })], [''],
+    cols.map(function(c) { return xlCell(c, { header: true }); })];
+  lista.forEach(function(p, i) {
+    var bg = i % 2 ? 'fdf8f0' : 'ffffff';
+    var fuente = p.fuentePrecio === 'carta' ? 'Precio de carta' : String(p.fuentePrecio || '').indexOf('ventas') === 0 ? 'Promedio ventas importadas' : 'Manual (hoja Productos)';
+    filas.push([xlCell(i + 1, { fillColor: bg }), xlCell(p.nombre, { fillColor: bg, bold: true }), xlCell(p.rubro, { fillColor: bg }),
+      xlCell(p.precioVenta, { peso: true, fillColor: bg }), xlCell(p.precioNeto || p.precioVenta, { peso: true, fillColor: bg }), xlCell(p.costoCalculado, { peso: true, fillColor: bg }),
+      xlCell(p.margen, { peso: true, fillColor: bg, positivo: p.margen >= 0, negativo: p.margen < 0 }), xlCell(p.margenPct, { pct: true, fillColor: bg }),
+      xlCell(p.foodCostReal, { pct: true, fillColor: bg, negativo: p.foodCostReal > p.foodCostTarget * 1.2 }), xlCell(p.foodCostTarget, { pct: true, fillColor: bg }), xlCell(fuente, { fillColor: bg })]);
+  });
+  filas.push(['']);
+  filas.push([xlCell('Márgenes e incidencia del costo calculados sobre el precio neto de IVA. Costos con el precio de la última compra de cada insumo.', { info: true })]);
+  var ws = xlAoaToSheet(filas);
+  ws['!cols'] = [{ wch: 5 }, { wch: 32 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 13 }, { wch: 13 }, { wch: 11 }, { wch: 16 }, { wch: 11 }, { wch: 26 }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cols.length - 1 } }];
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Análisis marginal');
+  XLSX.writeFile(wb, 'PapaAndres_AnalisisMarginal_' + fechaLocalISO(new Date()) + '.xlsx');
+  toast('Excel descargado ✓');
+}
+
+// ---------- Excel: Punto de equilibrio ----------
+function peExportarExcel() {
+  if (!_peData) { toast('Primero calculá el punto de equilibrio', false); return; }
+  var d = _peData, r = d.resumen || {};
+  var MC = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  var titulo = 'PUNTO DE EQUILIBRIO — ' + MESES[d.mes].toUpperCase() + ' ' + d.anio;
+  var fila = function(label, v, o) { return [xlCell(label, Object.assign({ bold: !!(o && o.bold) }, o || {})), xlCell(v, Object.assign({}, o || {}, { peso: !(o && o.pctV) , pct: !!(o && o.pctV) }))]; };
+  var filas = [[xlCell('🍕 PAPÁ ANDRÉS — ' + titulo, { title: true, fontColor: XL_CREMA }), xlCell('', { title: true }), xlCell('', { title: true })], [''],
+    [xlCell('Resultado', { header: true }), xlCell('Importe', { header: true }), xlCell('', { header: true })],
+    fila('Ventas netas del mes', d.ventasNetas),
+    fila('Punto de equilibrio ($)', d.pe$, { bold: true }),
+    [xlCell('Punto de equilibrio (pedidos)', {}), xlCell(Math.ceil(d.pePeds || 0), {})],
+    fila(d.superado ? 'Excedente sobre el equilibrio' : 'Falta para el equilibrio', Math.abs(d.brecha || 0), d.superado ? { positivo: true } : { negativo: true }),
+    fila('% alcanzado', d.pctAlcanzado, { pctV: true }),
+    fila('Contribución marginal %', (d.mc || 0) * (d.mc <= 1 ? 100 : 1), { pctV: true }),
+    fila('Contribución marginal $', d.mcPesos),
+    [xlCell('Pedidos del mes', {}), xlCell(d.pedidos || 0, {})],
+    fila('Promedio por pedido', d.ticketMedio), [''],
+    [xlCell('Costos', { header: true }), xlCell('Importe', { header: true }), xlCell('Tipo', { header: true })]];
+  [['Gastos fijos', r.gastosFijos, 'Fijo'], ['Alquiler', r.alquiler, 'Fijo'], ['Salarios', r.salarios, 'Fijo'], ['Amortizaciones', d.amortizacion, 'Fijo'],
+   ['Compras / Insumos', r.compras, 'Variable'], ['Gastos variables', r.gastosVar, 'Variable'], ['Envíos', r.envios, 'Variable']].forEach(function(c) {
+    filas.push([xlCell(c[0]), xlCell(c[1] || 0, { peso: true }), xlCell(c[2], { fontColor: c[2] === 'Fijo' ? XL_AZUL : '92400e' })]);
+  });
+  filas.push([xlCell('Total costos fijos', { subtotal: true }), xlCell(d.costoFijo, { peso: true, subtotal: true }), xlCell('', { subtotal: true })]);
+  filas.push([xlCell('Total costos variables', { subtotal: true }), xlCell(d.costoVariable, { peso: true, subtotal: true }), xlCell('', { subtotal: true })]);
+  filas.push(['']);
+  filas.push([xlCell('Evolución ' + d.anio, { header: true }), xlCell('Ventas netas', { header: true }), xlCell('Punto de equilibrio', { header: true }), xlCell('¿Superado?', { header: true })]);
+  (d.evolucion || []).forEach(function(e) {
+    filas.push([xlCell(MC[e.mes - 1] || e.mes, { bold: e.mes === d.mes }), xlCell(e.ventas || 0, { peso: true }), xlCell(e.pe || 0, { peso: true }),
+      xlCell(e.ventas > 0 ? (e.superado ? 'Sí' : 'No') : '—', { positivo: e.superado, negativo: e.ventas > 0 && !e.superado })]);
+  });
+  var ws = xlAoaToSheet(filas);
+  ws['!cols'] = [{ wch: 34 }, { wch: 18 }, { wch: 20 }, { wch: 12 }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Punto de equilibrio');
+  XLSX.writeFile(wb, 'PapaAndres_PuntoEquilibrio_' + MESES[d.mes] + '_' + d.anio + '.xlsx');
+  toast('Excel descargado ✓');
+}
+
+// ---------- Cuentas corrientes: saldos ----------
+function ccFilasExport() {
+  var r = _ccResumen[_ccVista]; if (!r) return null;
+  var soloSaldo = document.getElementById('cc-con-saldo').checked, busq = (document.getElementById('cc-buscar').value || '').toLowerCase().trim();
+  return r.filas.filter(function(f) { return (!soloSaldo || Math.abs(f.saldo) > 0.005) && (!busq || f.tercero.toLowerCase().indexOf(busq) >= 0); });
+}
+function ccSaldosPDF() {
+  var filas = ccFilasExport(); if (!filas || !filas.length) return toast('No hay saldos para exportar', false);
+  var esCli = _ccVista === 'CLIENTE', f = ccFmt, t = { saldo: 0, vencido: 0, alDia: 0, d30: 0, d60: 0, d90: 0, mas90: 0 };
+  filas.forEach(function(x) { Object.keys(t).forEach(function(k) { t[k] += x[k]; }); });
+  var c = function(v) { return Math.abs(v) > 0.005 ? f(v) : '—'; };
+  var cuerpo = '<div class="kpi-grid"><div class="kpi"><div class="kpi-label">' + (esCli ? 'Saldo a cobrar' : 'Saldo a pagar') + '</div><div class="kpi-value">' + f(t.saldo) + '</div></div>' +
+    '<div class="kpi"><div class="kpi-label">Vencido</div><div class="kpi-value" style="color:#d61220">' + f(t.vencido) + '</div></div>' +
+    '<div class="kpi"><div class="kpi-label">Al día</div><div class="kpi-value" style="color:#657a2d">' + f(t.alDia) + '</div></div>' +
+    '<div class="kpi"><div class="kpi-label">' + (esCli ? 'Clientes' : 'Proveedores') + '</div><div class="kpi-value">' + filas.length + '</div></div></div>' +
+    '<table><thead><tr><th>' + (esCli ? 'Cliente' : 'Proveedor') + '</th><th class="n">Saldo</th><th class="n">Al día</th><th class="n">1–30 d</th><th class="n">31–60 d</th><th class="n">61–90 d</th><th class="n">+90 d</th><th>Último mov.</th></tr></thead><tbody>' +
+    filas.map(function(x) { return '<tr><td><b>' + ccEsc(x.tercero) + '</b></td><td class="n"><b>' + f(x.saldo) + '</b>' + (x.saldo < -0.005 ? '<br><span style="font-size:9px;color:#657a2d">a favor</span>' : '') + '</td><td class="n">' + c(x.alDia) + '</td><td class="n">' + c(x.d30) + '</td><td class="n">' + c(x.d60) + '</td><td class="n">' + c(x.d90) + '</td><td class="n">' + c(x.mas90) + '</td><td>' + (x.ultimoMovimiento || '—') + '</td></tr>'; }).join('') +
+    '<tr class="tot"><td>Total</td><td class="n">' + f(t.saldo) + '</td><td class="n">' + c(t.alDia) + '</td><td class="n">' + c(t.d30) + '</td><td class="n">' + c(t.d60) + '</td><td class="n">' + c(t.d90) + '</td><td class="n">' + c(t.mas90) + '</td><td></td></tr></tbody></table>' +
+    '<div class="nota">Saldo positivo = ' + (esCli ? 'el cliente nos debe' : 'le debemos al proveedor') + '. Antigüedad según días desde el vencimiento; lo cobrado/pagado se aplica primero a lo más viejo.</div>';
+  descargarPDF(_reporteHTML(esCli ? 'Saldos de clientes' : 'Saldos de proveedores', 'Al ' + new Date().toLocaleDateString('es-AR'), cuerpo),
+    _nombreArchivo((esCli ? 'SaldosClientes_' : 'SaldosProveedores_') + fechaLocalISO(new Date())), { ancho: 1000, titulo: 'Papá Andrés · Cuentas corrientes' });
+}
+function ccSaldosExcel() {
+  var filas = ccFilasExport(); if (!filas || !filas.length) return toast('No hay saldos para exportar', false);
+  var esCli = _ccVista === 'CLIENTE';
+  var cols = [esCli ? 'Cliente' : 'Proveedor', 'Saldo', 'Vencido', 'Al día', '1–30 días', '31–60 días', '61–90 días', 'Más de 90 días', 'Último movimiento'];
+  var aoa = [[xlCell('🍕 PAPÁ ANDRÉS — ' + (esCli ? 'SALDOS DE CLIENTES' : 'SALDOS DE PROVEEDORES'), { title: true, fontColor: XL_CREMA })].concat(cols.slice(1).map(function() { return xlCell('', { title: true }); })),
+    [xlCell('Al ' + new Date().toLocaleDateString('es-AR') + ' · saldo positivo = ' + (esCli ? 'nos debe' : 'le debemos'), { bold: true, fontColor: XL_GRIS })], [''],
+    cols.map(function(c) { return xlCell(c, { header: true }); })];
+  var t = [0, 0, 0, 0, 0, 0, 0];
+  filas.forEach(function(x, i) {
+    var bg = i % 2 ? 'fdf8f0' : 'ffffff', v = [x.saldo, x.vencido, x.alDia, x.d30, x.d60, x.d90, x.mas90];
+    v.forEach(function(n, j) { t[j] += n; });
+    aoa.push([xlCell(x.tercero, { bold: true, fillColor: bg })].concat(v.map(function(n, j) { return xlCell(n, { peso: true, fillColor: bg, negativo: j === 1 && n > 0 }); })).concat([xlCell(x.ultimoMovimiento || '', { fillColor: bg })]));
+  });
+  aoa.push([xlCell('TOTAL', { total: true })].concat(t.map(function(n) { return xlCell(n, { peso: true, total: true }); })).concat([xlCell('', { total: true })]));
+  var ws = xlAoaToSheet(aoa);
+  ws['!cols'] = [{ wch: 32 }].concat(cols.slice(1, -1).map(function() { return { wch: 15 }; })).concat([{ wch: 18 }]);
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cols.length - 1 } }];
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, esCli ? 'Clientes' : 'Proveedores');
+  XLSX.writeFile(wb, 'PapaAndres_' + (esCli ? 'SaldosClientes_' : 'SaldosProveedores_') + fechaLocalISO(new Date()) + '.xlsx');
+  toast('Excel descargado ✓');
+}
+
+// ---------- Cuentas corrientes: resumen de cuenta de un cliente/proveedor ----------
+var _ccMovsActual = null;
+function ccCuentaPDF() {
+  var movs = _ccMovsActual; if (!movs || !movs.length) return toast('La cuenta no tiene movimientos', false);
+  var esCli = _ccVista === 'CLIENTE', f = ccFmt, saldo = movs[movs.length - 1].saldo;
+  var cli = esCli ? _ccClientes.filter(function(c) { return c.nombre === _ccSel; })[0] : null;
+  var res = (_ccResumen[_ccVista] && _ccResumen[_ccVista].filas || []).filter(function(x) { return x.tercero === _ccSel; })[0] || {};
+  var datos = cli ? [cli.cuit && 'CUIT ' + cli.cuit, cli.condicionIva, cli.aPlazo ? 'Plazo ' + cli.diasPlazo + ' días' : ''].filter(Boolean).join(' · ') : '';
+  var cuerpo = (datos ? '<div style="font-size:11px;color:#8a7a5a;margin:-6px 0 12px">' + ccEsc(datos) + '</div>' : '') +
+    '<div class="kpi-grid"><div class="kpi"><div class="kpi-label">Saldo al ' + new Date().toLocaleDateString('es-AR') + '</div><div class="kpi-value">' + f(Math.abs(saldo)) + '</div><div style="font-size:10px;color:#8a7a5a">' +
+      (Math.abs(saldo) < 0.005 ? 'Cuenta saldada' : saldo > 0 ? (esCli ? 'a cobrar' : 'a pagar') : (esCli ? 'a favor del cliente' : 'a favor nuestro')) + '</div></div>' +
+    '<div class="kpi"><div class="kpi-label">Vencido</div><div class="kpi-value" style="color:#d61220">' + f(res.vencido || 0) + '</div></div>' +
+    '<div class="kpi"><div class="kpi-label">Al día</div><div class="kpi-value" style="color:#657a2d">' + f(res.alDia || 0) + '</div></div>' +
+    '<div class="kpi"><div class="kpi-label">Movimientos</div><div class="kpi-value">' + movs.length + '</div></div></div>' +
+    '<table><thead><tr><th>Fecha</th><th>Concepto</th><th>Comprobante</th><th>Medio</th><th>Vence</th><th class="n">Debe</th><th class="n">Haber</th><th class="n">Saldo</th></tr></thead><tbody>' +
+    movs.map(function(m) { return '<tr><td>' + m.fecha + '</td><td>' + (CC_CONCEPTOS[m.concepto] || m.concepto) + (m.notas ? '<br><span style="font-size:9px;color:#8a7a5a">' + ccEsc(m.notas) + '</span>' : '') + '</td><td>' + ccEsc(m.comprobante || '') + '</td><td>' + ccEsc(m.medio || '') + '</td><td>' + (m.vencimiento || '') + '</td>' +
+      '<td class="n">' + (m.debe ? f(m.debe) : '') + '</td><td class="n">' + (m.haber ? f(m.haber) : '') + '</td><td class="n"><b>' + f(m.saldo) + '</b></td></tr>'; }).join('') +
+    '</tbody></table><div class="nota">' + (esCli ? 'Debe: ventas y saldos a cobrar · Haber: cobros.' : 'Haber: compras y saldos a pagar · Debe: pagos.') + ' Saldo positivo = ' + (esCli ? 'el cliente nos debe' : 'le debemos al proveedor') + '.</div>';
+  descargarPDF(_reporteHTML('Resumen de cuenta: ' + ccEsc(_ccSel), esCli ? 'Cliente' : 'Proveedor', cuerpo),
+    _nombreArchivo('Cuenta_' + _ccSel + '_' + fechaLocalISO(new Date())), { ancho: 1000, titulo: 'Papá Andrés · Resumen de cuenta ' + _ccSel });
+}
+function ccCuentaExcel() {
+  var movs = _ccMovsActual; if (!movs || !movs.length) return toast('La cuenta no tiene movimientos', false);
+  var esCli = _ccVista === 'CLIENTE';
+  var cols = ['Fecha', 'Concepto', 'Comprobante', 'Medio', 'Vencimiento', 'Debe', 'Haber', 'Saldo', 'Notas'];
+  var aoa = [[xlCell('🍕 PAPÁ ANDRÉS — CUENTA CORRIENTE: ' + _ccSel.toUpperCase(), { title: true, fontColor: XL_CREMA })].concat(cols.slice(1).map(function() { return xlCell('', { title: true }); })),
+    [xlCell((esCli ? 'Cliente' : 'Proveedor') + ' · al ' + new Date().toLocaleDateString('es-AR') + ' · saldo positivo = ' + (esCli ? 'nos debe' : 'le debemos'), { bold: true, fontColor: XL_GRIS })], [''],
+    cols.map(function(c) { return xlCell(c, { header: true }); })];
+  movs.forEach(function(m, i) {
+    var bg = i % 2 ? 'fdf8f0' : 'ffffff';
+    aoa.push([xlCell(m.fecha, { fillColor: bg }), xlCell(CC_CONCEPTOS[m.concepto] || m.concepto, { fillColor: bg }), xlCell(m.comprobante || '', { fillColor: bg }), xlCell(m.medio || '', { fillColor: bg }),
+      xlCell(m.vencimiento || '', { fillColor: bg }), xlCell(m.debe || 0, { peso: true, fillColor: bg }), xlCell(m.haber || 0, { peso: true, fillColor: bg }), xlCell(m.saldo, { peso: true, fillColor: bg, bold: true }), xlCell(m.notas || '', { fillColor: bg })]);
+  });
+  var ws = xlAoaToSheet(aoa);
+  ws['!cols'] = [{ wch: 12 }, { wch: 15 }, { wch: 22 }, { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 16 }, { wch: 30 }];
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cols.length - 1 } }];
+  var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Cuenta corriente');
+  XLSX.writeFile(wb, ('PapaAndres_Cuenta_' + _ccSel + '_' + fechaLocalISO(new Date())).replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '_') + '.xlsx');
+  toast('Excel descargado ✓');
 }
 
 // TOAST
