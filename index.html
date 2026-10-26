@@ -2,7 +2,15 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#233f20">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icono-192.png">
+<link rel="apple-touch-icon" href="icono-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Papá Andrés">
 <title>Papá Andrés — Gestión 2026</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- xlsx-js-style permite exportar Excel con colores y formatos -->
@@ -187,12 +195,59 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
 .resumen-total-row{background:var(--verde);color:var(--crema);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:10px}
 .resumen-total-row .rt-label{font-size:12px;font-weight:500;opacity:.85}
 .resumen-total-row .rt-valor{font-size:22px;font-weight:700}
-@media(max-width:700px){
+/* Ítems de la venta manual (misma grilla que los ítems de compra) */
+.item-row{display:grid;grid-template-columns:2.5fr 80px 120px 110px 36px;gap:8px;align-items:end;margin-bottom:8px;padding:10px 12px;background:#fdf8f0;border-radius:8px;border:1px solid #e8d9b8}
+/* Navegación para celular: botón de menú, fondo del menú y barra inferior (ocultos en PC) */
+.menu-btn{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin-left:-6px;border:none;background:transparent;color:var(--verde);font-size:22px;cursor:pointer;border-radius:8px;flex-shrink:0}
+.menu-btn:active{background:var(--crema-dark)}
+.sidebar-backdrop{display:none}
+.bottom-nav{display:none}
+.solo-movil{display:none}
+@media(max-width:900px){
   :root{--sidebar-w:0px}
-  .sidebar{display:none}
-  .main{padding:16px}
+  .sidebar{width:270px;transform:translateX(-100%);transition:transform .25s ease;z-index:300;box-shadow:4px 0 24px rgba(0,0,0,.25)}
+  body.menu-abierto .sidebar{transform:none}
+  .sidebar-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:290}
+  body.menu-abierto .sidebar-backdrop{display:block}
+  body.menu-abierto{overflow:hidden}
+  .nav-item{padding:13px 18px}
+  .nav-item .label{font-size:14px}
+  .nav-item .ico{font-size:17px;width:22px}
+  .menu-btn{display:flex}
+  .topbar{left:0;padding:0 12px;gap:8px}
+  .topbar-title{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .main{margin-left:0;padding:14px 12px calc(80px + env(safe-area-inset-bottom))}
+  .bottom-nav{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc(60px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:var(--verde);z-index:95;box-shadow:0 -2px 12px rgba(0,0,0,.15)}
+  .bottom-nav button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:none;background:transparent;color:#c8dfc0;font-family:'Poppins',sans-serif;font-size:19px;cursor:pointer;border-top:3px solid transparent;padding:0}
+  .bottom-nav button span{font-size:10px;font-weight:500;letter-spacing:.2px}
+  .bottom-nav button.active{color:var(--crema);border-top-color:var(--rojo);background:rgba(214,18,32,.12)}
+  #toast{bottom:calc(76px + env(safe-area-inset-bottom));max-width:92vw;text-align:center}
+  .card{padding:16px 14px}
+  .m-stack{grid-template-columns:1fr !important}
+  .month-tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none}
+  .month-tabs::-webkit-scrollbar{display:none}
+  .mtab{flex:0 0 auto;padding:8px 13px;font-size:12px}
+  /* Ventanas emergentes a pantalla completa */
+  #modal-manual,#modal-prod,#sim-modal{top:0!important;left:0!important;transform:none!important;width:100%!important;max-width:none!important;height:100%!important;max-height:none!important;border-radius:0!important;border:none!important;padding:16px 14px calc(16px + env(safe-area-inset-bottom))!important;z-index:310!important}
+}
+@media(max-width:700px){
   .upload-grid,.two-col,.form-grid-2,.form-grid-3{grid-template-columns:1fr}
-  .item-row{grid-template-columns:1fr 1fr}
+  /* 16 px evita que el iPhone haga zoom al tocar un campo */
+  .form-input,.mes-selector select{font-size:16px;padding:10px 12px}
+  .btn{padding:11px 18px}
+  .btn-sm{padding:9px 14px;font-size:13px}
+  .gtab{padding:9px 14px;font-size:12px}
+  .tipo-btn{padding:10px 14px;font-size:13px}
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{padding:12px}
+  .kpi-value{font-size:18px;word-break:break-word}
+  .item-compra-row,.item-row{grid-template-columns:1fr 1fr;padding:10px}
+  .item-compra-row>div:first-child,.item-row>div:first-child{grid-column:1/-1}
+  .item-compra-row .ic-sub,.item-row .item-subtotal{text-align:left}
+  .g-tabla td,.g-tabla th{padding:8px}
+  .no-movil{display:none}
+  .solo-movil{display:block}
+  .celda-prov{white-space:normal!important;min-width:120px}
 }
 </style>
 </head>
@@ -228,7 +283,10 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
   <div class="nav-footer">v3.2 · Papá Andrés 2026</div>
 </aside>
 
+<div class="sidebar-backdrop" onclick="toggleMenu(false)"></div>
+
 <div class="topbar">
+  <button class="menu-btn" onclick="toggleMenu()" aria-label="Abrir menú">☰</button>
   <div class="topbar-title" id="topbar-title">Tablero de control</div>
   <div class="topbar-right">
     <div class="pill pill-oliva" id="topbar-mes">Cargando...</div>
@@ -1050,6 +1108,13 @@ body{font-family:'Poppins',sans-serif;background:#f5f0e8;color:#1a1a1a;min-heigh
   </div>
 </div>
 
+<nav class="bottom-nav" aria-label="Accesos rápidos">
+  <button data-nav="dashboard" onclick="navMovil('dashboard')">▦<span>Tablero</span></button>
+  <button data-nav="ventas" onclick="navMovil('ventas')">📈<span>Ventas</span></button>
+  <button data-nav="gastos" onclick="navMovil('gastos')">🧾<span>Compras</span></button>
+  <button data-nav="productos" onclick="navMovil('productos')">🍕<span>Productos</span></button>
+  <button data-nav="__menu" onclick="toggleMenu()">☰<span>Más</span></button>
+</nav>
 <div id="toast"></div>
 
 <script>
@@ -1231,6 +1296,43 @@ function nav(id, btn) {
   if (id==='rep-marginal') amCargar();
 }
 
+// Fecha AAAA-MM-DD en hora local (toISOString usa UTC: después de las 21 h en Argentina daba el día siguiente).
+function fechaLocalISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+// ---- Navegación en celular ----
+function toggleMenu(abrir) {
+  var b = document.body;
+  if (abrir === undefined) abrir = !b.classList.contains('menu-abierto');
+  b.classList.toggle('menu-abierto', !!abrir);
+}
+function navMovil(id) {
+  var item = [].filter.call(document.querySelectorAll('.sidebar .nav-item'), function(n) {
+    return (n.getAttribute('onclick') || '').indexOf("nav('" + id + "'") >= 0;
+  })[0];
+  if (item) nav(id, item);
+}
+function _syncBottomNav(id) {
+  var hay = false;
+  document.querySelectorAll('.bottom-nav button').forEach(function(b) {
+    var on = b.getAttribute('data-nav') === id;
+    if (on) hay = true;
+    b.classList.toggle('active', on);
+  });
+  // Pantallas que no están en la barra: se marca "Más"
+  if (!hay) { var m = document.querySelector('.bottom-nav button[data-nav="__menu"]'); if (m) m.classList.add('active'); }
+}
+(function() {
+  var navOriginal = nav;
+  nav = function(id, btn) {
+    navOriginal(id, btn);
+    _syncBottomNav(id);
+    toggleMenu(false);
+    if (window.matchMedia('(max-width:900px)').matches) window.scrollTo(0, 0);
+  };
+})();
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') toggleMenu(false); });
+document.addEventListener('DOMContentLoaded', function() { _syncBottomNav('dashboard'); });
+
 // ============================================================
 // DASHBOARD
 // ============================================================
@@ -1242,7 +1344,7 @@ function cargarDashboard() {
   document.getElementById('panel-dashboard').innerHTML =
     '<div class="month-tabs">'+'<div class="skel skel-line w40" style="height:28px;border-radius:20px;width:600px"></div></div>'+
     '<div class="kpi-grid">'+'<div class="skel skel-kpi"></div>'.repeat(4)+'</div>'+
-    '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px"><div class="skel" style="height:180px;border-radius:12px"></div><div class="skel" style="height:180px;border-radius:12px"></div></div>';
+    '<div class="m-stack" style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px"><div class="skel" style="height:180px;border-radius:12px"></div><div class="skel" style="height:180px;border-radius:12px"></div></div>';
 
   var mesAnt = mesActivo === 1 ? 12 : mesActivo - 1;
   var anioAnt = mesActivo === 1 ? anioActivo - 1 : anioActivo;
@@ -1287,7 +1389,7 @@ function renderDashboard(d, prev) {
       '<div class="kpi"><div class="kpi-label">Pedidos del mes</div><div class="kpi-value">'+(d.pedidos||'—')+'</div>'+
         '<div class="kpi-delta" style="color:#8a7a5a">Promedio por pedido '+(d.ticketMedio?fmt(d.ticketMedio):'—')+'</div></div>'+
     '</div>'+
-    '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px">'+
+    '<div class="m-stack" style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px">'+
       '<div class="card"><div class="card-title">Ventas por mes — '+anioActivo+'</div>'+
         '<div style="height:120px;display:flex;align-items:flex-end;gap:6px">'+renderBarChart(d.ventasPorMes)+'</div></div>'+
       '<div class="card"><div class="card-title">Resultado · '+MESES[mesActivo]+'</div>'+renderMiniResultado(d, prev, fmt, delta)+'</div>'+
@@ -1783,8 +1885,8 @@ function sTab(id, btn) {
 
 function sInicializarModulo() {
   var hoy = new Date();
-  document.getElementById('s-fecha').value = hoy.toISOString().split('T')[0];
-  document.getElementById('r-fecha').value = hoy.toISOString().split('T')[0];
+  document.getElementById('s-fecha').value = fechaLocalISO(hoy);
+  document.getElementById('r-fecha').value = fechaLocalISO(hoy);
   var periodoEl = document.getElementById('s-periodo');
   if(periodoEl) periodoEl.value = MESES[hoy.getMonth()+1] + ' ' + hoy.getFullYear();
   sCargarSelectEmpleados();
@@ -1944,7 +2046,7 @@ function sExportarExcel(tipo) {
 // ============================================================
 // MÓDULO GASTOS
 // ============================================================
-function gInicializarGastos(){var hoy=new Date(),mesActual=hoy.getMonth()+1,anioActual=hoy.getFullYear();var gFecha=document.getElementById('g-fecha');if(gFecha)gFecha.value=hoy.toISOString().split('T')[0];// Agregar ítem inicial en compras
+function gInicializarGastos(){var hoy=new Date(),mesActual=hoy.getMonth()+1,anioActual=hoy.getFullYear();var gFecha=document.getElementById('g-fecha');if(gFecha)gFecha.value=fechaLocalISO(hoy);// Agregar ítem inicial en compras
 setTimeout(function(){if(document.getElementById('g-items-compra')&&document.getElementById('g-items-compra').children.length===0){gAgregarItemCompra();}},200);['h-mes','h-anio','g-res-mes','g-res-anio'].forEach(function(id){var el=document.getElementById(id);if(!el)return;var isMes=id.includes('mes');el.innerHTML='<option value="">Todos</option>';if(isMes){MESES.slice(1).forEach(function(m,i){var opt=document.createElement('option');opt.value=i+1;opt.textContent=m;if(i+1===mesActual)opt.selected=true;el.appendChild(opt);});}else{for(var y=anioActual;y>=2026;y--){var opt=document.createElement('option');opt.value=y;opt.textContent=y;if(y===anioActual)opt.selected=true;el.appendChild(opt);}}});gLlenarInsumos();if(gProveedores.length)gLlenarSelectsProveedores();else apiGet('proveedores').then(function(data){gProveedores=data||[];gLlenarSelectsProveedores();}).catch(function(){});}
 function gTab(id,btn){['registrar','historial','proveedores','resumen'].forEach(function(t){document.getElementById('gtab-'+t).style.display=t===id?'':'none';});document.querySelectorAll('#panel-gastos .gtab').forEach(function(b){b.classList.remove('active');});btn.classList.add('active');if(id==='proveedores')apiGet('proveedores').then(function(data){gProveedores=data||[];gMostrarListaProveedores();});}
 function gTogglePanel(id){var el=document.getElementById(id);el.style.display=el.style.display==='none'?'block':'none';}
@@ -2127,7 +2229,7 @@ function gGuardar(){var fecha=document.getElementById('g-fecha').value,notas=doc
     else toast('Error al guardar la compra: '+((r&&(r.msg||r.error))||''),false);
   }).catch(function(e){toast('Error: '+e.message,false);});
 }else if(gTipoActual==='gasto'){if(!gNatActual)return toast('Seleccioná si el gasto es Fijo o Variable',false);var concepto=document.getElementById('g-concepto').value.trim(),monto=document.getElementById('g-monto-gasto').value;if(!concepto||!monto)return toast('Completá concepto y monto',false);apiPost(gNatActual==='fijo'?'registrarGastoFijo':'registrarGastoVariable',{fecha:fecha,concepto:concepto,categoria:document.getElementById('g-cat-gasto').value,periodo:document.getElementById('g-periodo-gasto').value,monto:monto,proveedor:prov,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='envio'){var plat=document.getElementById('g-plataforma').value,mEnv=document.getElementById('g-monto-envio').value;if(!plat||!mEnv)return toast('Completá plataforma y monto',false);apiPost('registrarEnvio',{fecha:fecha,plataforma:plat,descripcion:document.getElementById('g-desc-envio').value,monto:mEnv,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='bien'){var cat=document.getElementById('g-cat-bien').value,desc=document.getElementById('g-desc-bien').value.trim(),mBien=document.getElementById('g-monto-bien').value;if(!cat||!desc||!mBien)return toast('Completá categoría, descripción y monto',false);apiPost('registrarBienDeUso',{fecha:fecha,categoria:cat,descripcion:desc,proveedor:prov,monto:mBien,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}else if(gTipoActual==='alquiler'){var per=document.getElementById('g-periodo-alq').value.trim(),mAlq=document.getElementById('g-monto-alq').value;if(!per||!mAlq)return toast('Completá período y monto',false);apiPost('registrarAlquiler',{fecha:fecha,periodo:per,monto:mAlq,notas:notas}).then(function(r){if(r.ok){toast('Guardado ✓');gLimpiarForm();}else toast('Error',false);});}}
-function gLimpiarForm(){var hoy=new Date().toISOString().split('T')[0];document.getElementById('g-fecha').value=hoy;['g-comprobante','g-concepto','g-cat-gasto','g-periodo-gasto','g-monto-gasto','g-plataforma','g-desc-envio','g-monto-envio','g-cat-bien','g-desc-bien','g-monto-bien','g-periodo-alq','g-monto-alq','g-notas','g-subtotal','g-iva-monto','g-perc-iva','g-perc-iibb','g-perc-gan','g-total-pagar'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});var ivaEl=document.getElementById('g-iva');if(ivaEl)ivaEl.value='21';document.getElementById('g-vida-util-info').style.display='none';if(gTipoActual==='gasto'){document.querySelectorAll('.nat-sel-btn').forEach(function(b){b.classList.remove('active');});gNatActual=null;}// Limpiar ítems de compra
+function gLimpiarForm(){var hoy=fechaLocalISO(new Date());document.getElementById('g-fecha').value=hoy;['g-comprobante','g-concepto','g-cat-gasto','g-periodo-gasto','g-monto-gasto','g-plataforma','g-desc-envio','g-monto-envio','g-cat-bien','g-desc-bien','g-monto-bien','g-periodo-alq','g-monto-alq','g-notas','g-subtotal','g-iva-monto','g-perc-iva','g-perc-iibb','g-perc-gan','g-total-pagar'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});var ivaEl=document.getElementById('g-iva');if(ivaEl)ivaEl.value='21';document.getElementById('g-vida-util-info').style.display='none';if(gTipoActual==='gasto'){document.querySelectorAll('.nat-sel-btn').forEach(function(b){b.classList.remove('active');});gNatActual=null;}// Limpiar ítems de compra
 var cont=document.getElementById('g-items-compra');if(cont)cont.innerHTML='';var tot=document.getElementById('ic-total-row');if(tot)tot.remove();_gCompraItems=0;// Agregar un ítem vacío nuevo si estamos en compra
 if(gTipoActual==='compra'){setTimeout(function(){gAgregarItemCompra();},50);}}
 function gLlenarSelectsProveedores(){var sel=document.getElementById('g-proveedor');if(!sel)return;sel.innerHTML='<option value="">Sin proveedor</option>';gProveedores.forEach(function(p){sel.appendChild(new Option(p.nombre,p.nombre));});}
@@ -2189,23 +2291,24 @@ function gRenderCompras(cont, busqConc, busqProv) {
   var f2 = function(n) { return (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
   var esc = function(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); };
   var tot = { sub: 0, iva: 0, perc: 0, total: 0, items: 0 };
-  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th style="width:28px"></th><th>Fecha</th><th>Proveedor</th><th>Comprobante</th>' +
-    '<th style="text-align:right">Ítems</th><th style="text-align:right">Subtotal</th><th style="text-align:right">IVA</th><th style="text-align:right">Percepciones</th>' +
+  var html = '<div class="g-tabla-wrap"><table class="g-tabla"><thead><tr><th style="width:28px"></th><th>Fecha</th><th>Proveedor</th><th class="no-movil">Comprobante</th>' +
+    '<th class="no-movil" style="text-align:right">Ítems</th><th class="no-movil" style="text-align:right">Subtotal</th><th class="no-movil" style="text-align:right">IVA</th><th class="no-movil" style="text-align:right">Percepciones</th>' +
     '<th style="text-align:right">Total</th><th style="width:96px"></th></tr></thead><tbody>';
   grupos.forEach(function(g, i) {
     tot.sub += g.subtotal; tot.iva += g.iva; tot.perc += g.percepciones; tot.total += g.total; tot.items += g.items.length;
     var abierto = !!_gComprasAbiertos[g.clave];
     html += '<tr style="cursor:pointer" onclick="gToggleComprobante(' + i + ')" data-cmp="' + i + '">' +
       '<td style="text-align:center;color:var(--oliva)" id="g-cmp-flecha-' + i + '">' + (abierto ? '▾' : '▸') + '</td>' +
-      '<td>' + esc(g.fecha) + '</td><td>' + (esc(g.proveedor) || '<span style="color:#8a7a5a">Sin proveedor</span>') + '</td>' +
-      '<td>' + (esc(g.comprobante) || '<span style="color:#8a7a5a">—</span>') + '</td>' +
-      '<td class="num">' + g.items.length + '</td><td class="num">' + f2(g.subtotal) + '</td><td class="num">' + f2(g.iva) + '</td>' +
-      '<td class="num">' + f2(g.percepciones) + '</td><td class="num" style="font-weight:600">' + f2(g.total) + '</td>' +
+      '<td>' + esc(g.fecha) + '</td><td class="celda-prov">' + (esc(g.proveedor) || '<span style="color:#8a7a5a">Sin proveedor</span>') +
+        '<div class="solo-movil" style="font-size:10px;color:#8a7a5a">' + (esc(g.comprobante) || 'Sin número') + ' · ' + g.items.length + ' ítem' + (g.items.length !== 1 ? 's' : '') + '</div></td>' +
+      '<td class="no-movil">' + (esc(g.comprobante) || '<span style="color:#8a7a5a">—</span>') + '</td>' +
+      '<td class="num no-movil">' + g.items.length + '</td><td class="num no-movil">' + f2(g.subtotal) + '</td><td class="num no-movil">' + f2(g.iva) + '</td>' +
+      '<td class="num no-movil">' + f2(g.percepciones) + '</td><td class="num" style="font-weight:600">' + f2(g.total) + '</td>' +
       '<td style="white-space:nowrap" onclick="event.stopPropagation()">' +
         '<button onclick="gEditarComprobante(' + i + ')" style="background:#f2f7e8;border:none;border-radius:5px;color:var(--verde);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1;margin-right:4px" title="Editar comprobante">✏</button>' +
         '<button onclick="gEliminarComprobante(' + i + ')" style="background:#fff0f0;border:none;border-radius:5px;color:var(--rojo);cursor:pointer;padding:3px 8px;font-size:13px;line-height:1" title="Eliminar comprobante completo">🗑</button>' +
       '</td></tr>';
-    html += '<tr id="g-cmp-det-' + i + '" style="display:' + (abierto ? '' : 'none') + '"><td></td><td colspan="9" style="background:#fdf8f0;padding:8px 10px">' +
+    html += '<tr id="g-cmp-det-' + i + '" style="display:' + (abierto ? '' : 'none') + '"><td class="no-movil"></td><td colspan="9" style="background:#fdf8f0;padding:8px 10px">' +
       '<table class="g-tabla" style="font-size:11px;margin:0"><thead><tr><th>Insumo</th><th>Unidad</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Precio unit. s/IVA</th><th style="text-align:right">Subtotal</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th><th>Notas</th></tr></thead><tbody>' +
       g.items.map(function(r) {
         return '<tr><td>' + esc(r.Insumo) + '</td><td>' + esc(r.Unidad) + '</td><td class="num">' + (parseFloat(r.Cantidad) || 0).toLocaleString('es-AR', { maximumFractionDigits: 3 }) + '</td>' +
@@ -2213,8 +2316,8 @@ function gRenderCompras(cont, busqConc, busqProv) {
           '<td style="color:#8a7a5a;max-width:260px">' + esc(r.Notas) + '</td></tr>';
       }).join('') + '</tbody></table></td></tr>';
   });
-  html += '</tbody><tfoot><tr style="font-weight:700"><td></td><td colspan="3">Total del período</td><td class="num">' + tot.items + '</td><td class="num">' + f2(tot.sub) + '</td><td class="num">' + f2(tot.iva) + '</td>' +
-    '<td class="num">' + f2(tot.perc) + '</td><td class="num">' + f2(tot.total) + '</td><td></td></tr></tfoot></table></div>' +
+  html += '</tbody><tfoot><tr style="font-weight:700"><td></td><td colspan="2">Total del período</td><td class="no-movil"></td><td class="num no-movil">' + tot.items + '</td><td class="num no-movil">' + f2(tot.sub) + '</td><td class="num no-movil">' + f2(tot.iva) + '</td>' +
+    '<td class="num no-movil">' + f2(tot.perc) + '</td><td class="num">' + f2(tot.total) + '</td><td></td></tr></tfoot></table></div>' +
     '<div style="font-size:11px;color:#8a7a5a;margin-top:8px">' + grupos.length + ' comprobante' + (grupos.length !== 1 ? 's' : '') + ' · ' + tot.items + ' ítem' + (tot.items !== 1 ? 's' : '') +
     '. Tocá un comprobante para ver sus ítems. El Excel se descarga con el detalle por ítem.</div>';
   cont.innerHTML = html;
@@ -3570,7 +3673,7 @@ function peRender(d) {
   }
   var desglose = '<div class="card" style="margin-bottom:16px">'+
     '<div class="card-title">Descomposición de costos — '+nombreMes+'</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">'+
+    '<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">'+
       '<div style="background:#dbeafe;border-radius:10px;padding:14px 18px;border-left:4px solid #1e40af">'+
         '<div style="font-size:10px;font-weight:600;color:#1e40af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px">🔵 Total costos fijos</div>'+
         '<div style="font-size:22px;font-weight:700;color:#1e40af">'+fmt(d.costoFijo)+'</div>'+
@@ -3726,7 +3829,7 @@ function peExportarHTML() {
       '</div>'+
     '</div>'+
     '<div class="card"><div class="card-title">Descomposición de costos</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'+
+      '<div class="m-stack" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'+
         '<div style="background:#dbeafe;border-radius:8px;padding:12px 16px;border-left:4px solid #1e40af"><div style="font-size:10px;font-weight:600;color:#1e40af;text-transform:uppercase;margin-bottom:4px">🔵 Costos fijos</div><div style="font-size:20px;font-weight:700;color:#1e40af">'+fmt(d.costoFijo)+'</div></div>'+
         '<div style="background:#fef3c7;border-radius:8px;padding:12px 16px;border-left:4px solid #92400e"><div style="font-size:10px;font-weight:600;color:#92400e;text-transform:uppercase;margin-bottom:4px">🟡 Costos variables</div><div style="font-size:20px;font-weight:700;color:#92400e">'+fmt(d.costoVariable)+'</div></div>'+
       '</div>'+
