@@ -420,7 +420,7 @@ function eliminarPlataforma(id) {
 // ── PUNTO 3: Anti-duplicado de comprobantes ──
 // Verifica si ya existe un comprobante igual del mismo proveedor
 // excluir: { numeroDeFila: true } — filas del propio comprobante cuando se lo está editando.
-function verificarComprobante(comprobante, proveedor, excluir) {
+function verificarComprobante(comprobante, proveedor, excluir, tipo) {
   if (!comprobante || !comprobante.trim()) return { duplicado: false }; // sin comprobante, no verificar
   var sheet = getSpreadsheet().getSheetByName('Compras');
   if (!sheet || sheet.getLastRow() <= 1) return { duplicado: false };
@@ -432,10 +432,16 @@ function verificarComprobante(comprobante, proveedor, excluir) {
   if (colProv < 0) colProv = 1;
   var compNorm = String(comprobante).trim().toUpperCase();
   var provNorm = String(proveedor||'').trim().toUpperCase();
+  var tipoNorm = _cmpNorm(tipo);
+  var colTipo = headers.indexOf('TipoComprobante');
   for (var i = 1; i < data.length; i++) {
     if (excluir && excluir[i + 1]) continue;
     var existComp = String(data[i][colComp]||'').trim().toUpperCase();
     var existProv = String(data[i][colProv]||'').trim().toUpperCase();
+    // Una factura y una nota de crédito pueden tener el mismo número: solo es duplicado si el tipo coincide
+    // (las compras viejas sin tipo cargado se siguen controlando solo por número).
+    var existTipo = colTipo >= 0 ? _cmpNorm(data[i][colTipo]) : '';
+    if (tipoNorm && existTipo && existTipo !== tipoNorm) continue;
     if (existComp && existComp === compNorm && (!provNorm || existProv === provNorm)) {
       return { duplicado: true, fila: i + 1 };
     }
@@ -467,21 +473,18 @@ function registrarCompraFactura(data) {
   return _vConLock(function() {
     var items = (data.items || []).filter(function(it){ return it && String(it.insumo || '').trim(); });
     if (!items.length) return { ok: false, msg: 'La factura no tiene ítems' };
+    var tipoErr = _cmpValidarTipo(data);
+    if (tipoErr) return tipoErr;
     if (data.comprobante && String(data.comprobante).trim()) {
-      var check = verificarComprobante(data.comprobante, data.proveedor);
-      if (check.duplicado) return { ok: false, duplicado: true, msg: 'El comprobante "' + data.comprobante + '" ya está registrado para este proveedor.' };
+      var check = verificarComprobante(data.comprobante, data.proveedor, null, data.tipoComprobante);
+      if (check.duplicado) return { ok: false, duplicado: true, msg: 'El comprobante ' + _cmpDescComp(data) + ' ya está registrado para este proveedor.' };
     }
     if (data.aPlazo && !String(data.proveedor || '').trim()) return { ok: false, msg: 'Para cargar una compra a plazo elegí el proveedor' };
     var sheet = getSpreadsheet().getSheetByName('Compras');
-    var rows = items.map(function(it) {
-      return [data.fecha, data.proveedor || '', String(it.insumo).trim().toUpperCase(), it.unidad || '',
-        parseFloat(it.cantidad) || 0, parseFloat(it.precioUnit) || 0, parseFloat(it.subtotal) || 0,
-        parseFloat(data.iva) || 0, parseFloat(it.ivaMonto) || 0, parseFloat(it.montoTotal) || 0,
-        parseFloat(it.percepcionIVA) || 0, parseFloat(it.percepcionIIBB) || 0, parseFloat(it.percepcionGanancias) || 0,
-        data.comprobante || '', it.notas || data.notas || ''];
-    });
+    var rows = _cmpFilas(data, items);
     var primera = sheet.getLastRow() + 1;
     sheet.getRange(primera, 1, rows.length, rows[0].length).setValues(rows);
+    _cmpMarcarTipo(sheet, primera, rows.length, data.tipoComprobante);
     if (data.aPlazo) _ccMarcarCompra(sheet, primera, rows.length, _ccCompraAPlazo(data, rows));
     return { ok: true, count: rows.length };
   });
@@ -525,23 +528,79 @@ function _cmpValidarOriginal(sheet, original) {
     .filter(function(n){ return n >= 2; });
   if (!filas.length) return { ok: false, msg: 'No se indicaron las filas del comprobante' };
   var ultima = sheet.getLastRow();
-  var datos = sheet.getRange(1, 1, ultima, 15).getValues();
+  var datos = sheet.getRange(1, 1, ultima, Math.max(sheet.getLastColumn(), 15)).getValues();
+  var colTipo = datos[0].map(function(h){ return String(h || '').trim(); }).indexOf('TipoComprobante');
   var fecha = _cmpFechaTxt(original.fecha), prov = _cmpNorm(original.proveedor), comp = _cmpNorm(original.comprobante);
+  // El tipo forma parte de la identidad del comprobante (si el front no lo manda, no se controla).
+  var conTipo = original.tipoComprobante !== undefined && original.tipoComprobante !== null;
+  var tipo = _cmpNorm(original.tipoComprobante);
+  var mismoTipo = function(r) { return !conTipo || (colTipo >= 0 ? _cmpNorm(r[colTipo]) : '') === tipo; };
   for (var i = 0; i < filas.length; i++) {
     var n = filas[i];
     if (n > ultima) return { ok: false, msg: 'El comprobante cambió desde que lo abriste. Recargá el historial.' };
     var r = datos[n - 1];
-    if (_cmpFechaTxt(r[0]) !== fecha || _cmpNorm(r[1]) !== prov || _cmpNorm(r[13]) !== comp)
+    if (_cmpFechaTxt(r[0]) !== fecha || _cmpNorm(r[1]) !== prov || _cmpNorm(r[13]) !== comp || !mismoTipo(r))
       return { ok: false, msg: 'El comprobante cambió desde que lo abriste. Recargá el historial.' };
   }
   // Tampoco puede haber aparecido otra línea del mismo comprobante que no esté en la lista.
   var set = {}; filas.forEach(function(n){ set[n] = true; });
   for (var j = 1; j < datos.length; j++) {
     var rr = datos[j];
-    if (!set[j + 1] && rr[0] && _cmpFechaTxt(rr[0]) === fecha && _cmpNorm(rr[1]) === prov && _cmpNorm(rr[13]) === comp)
+    if (!set[j + 1] && rr[0] && _cmpFechaTxt(rr[0]) === fecha && _cmpNorm(rr[1]) === prov && _cmpNorm(rr[13]) === comp && mismoTipo(rr))
       return { ok: false, msg: 'El comprobante cambió desde que lo abriste. Recargá el historial.' };
   }
   return { ok: true, filas: filas, set: set };
+}
+
+// ── Tipo de comprobante ──
+// Se graba en la columna "TipoComprobante" de Compras (la R, o la primera libre si la R ya está ocupada). Las notas de crédito se graban con los importes
+// en negativo (cantidad en positivo): así restan solas en Resumen, Estado de Resultados y Mayor de Proveedores,
+// y no pisan el precio de última compra (que solo toma precios > 0).
+var CMP_COL_TIPO = 18; // posición preferida; la real se busca por encabezado
+var TIPOS_COMPROBANTE = [
+  'FACTURA A', 'FACTURA B', 'FACTURA C',
+  'NOTA DE DÉBITO A', 'NOTA DE DÉBITO B', 'NOTA DE DÉBITO C',
+  'NOTA DE CRÉDITO A', 'NOTA DE CRÉDITO B', 'NOTA DE CRÉDITO C',
+  'TIQUE A', 'TIQUE B',
+  'TIQUE NOTA DE DÉBITO A', 'TIQUE NOTA DE DÉBITO B',
+  'TIQUE NOTA DE CRÉDITO A', 'TIQUE NOTA DE CRÉDITO B'
+];
+function _cmpEsNotaCredito(tipo) { return _cmpNorm(tipo).indexOf('NOTA DE CRÉDITO') >= 0; }
+function _cmpValidarTipo(data) {
+  var t = _cmpNorm(data.tipoComprobante);
+  if (t && TIPOS_COMPROBANTE.indexOf(t) < 0) return { ok: false, msg: 'Tipo de comprobante inválido: ' + data.tipoComprobante };
+  data.tipoComprobante = t;
+  return null;
+}
+function _cmpDescComp(data) {
+  return (data.tipoComprobante ? data.tipoComprobante + ' ' : '') + '"' + data.comprobante + '"';
+}
+// Filas de Compras (A:O) de un comprobante; en las notas de crédito los importes van en negativo.
+function _cmpFilas(data, items) {
+  var sg = _cmpEsNotaCredito(data.tipoComprobante) ? -1 : 1;
+  var imp = function(v) { return sg * Math.abs(parseFloat(v) || 0); };
+  return items.map(function(it) {
+    return [data.fecha, data.proveedor || '', String(it.insumo).trim().toUpperCase(), it.unidad || '',
+      Math.abs(parseFloat(it.cantidad) || 0), imp(it.precioUnit), imp(it.subtotal),
+      parseFloat(data.iva) || 0, imp(it.ivaMonto), imp(it.montoTotal),
+      imp(it.percepcionIVA), imp(it.percepcionIIBB), imp(it.percepcionGanancias),
+      data.comprobante || '', it.notas || data.notas || ''];
+  });
+}
+function _cmpColTipo(sheet) {
+  var ultCol = sheet.getLastColumn();
+  var heads = sheet.getRange(1, 1, 1, Math.max(ultCol, 1)).getValues()[0].map(function(h){ return String(h || '').trim(); });
+  var i = heads.indexOf('TipoComprobante');
+  if (i >= 0) return i + 1;
+  var col = CMP_COL_TIPO;
+  if (col <= ultCol && heads[col - 1]) col = ultCol + 1; // la R ya tiene otra cosa: usar la primera libre a la derecha
+  sheet.getRange(1, col).setValue('TipoComprobante');
+  return col;
+}
+function _cmpMarcarTipo(sheet, primeraFila, n, tipo) {
+  var col = _cmpColTipo(sheet);
+  var v = []; for (var i = 0; i < n; i++) v.push([tipo || '']);
+  sheet.getRange(primeraFila, col, n, 1).setValues(v);
 }
 
 function _cmpBorrarFilas(sheet, filas) {
@@ -557,22 +616,19 @@ function editarCompraFactura(data) {
     if (!val.ok) return val;
     var items = (data.items || []).filter(function(it){ return it && String(it.insumo || '').trim(); });
     if (!items.length) return { ok: false, msg: 'La factura no tiene ítems' };
+    var tipoErr = _cmpValidarTipo(data);
+    if (tipoErr) return tipoErr;
     if (data.comprobante && String(data.comprobante).trim()) {
-      var check = verificarComprobante(data.comprobante, data.proveedor, val.set);
-      if (check.duplicado) return { ok: false, duplicado: true, msg: 'El comprobante "' + data.comprobante + '" ya está registrado para este proveedor.' };
+      var check = verificarComprobante(data.comprobante, data.proveedor, val.set, data.tipoComprobante);
+      if (check.duplicado) return { ok: false, duplicado: true, msg: 'El comprobante ' + _cmpDescComp(data) + ' ya está registrado para este proveedor.' };
     }
-    var rows = items.map(function(it) {
-      return [data.fecha, data.proveedor || '', String(it.insumo).trim().toUpperCase(), it.unidad || '',
-        parseFloat(it.cantidad) || 0, parseFloat(it.precioUnit) || 0, parseFloat(it.subtotal) || 0,
-        parseFloat(data.iva) || 0, parseFloat(it.ivaMonto) || 0, parseFloat(it.montoTotal) || 0,
-        parseFloat(it.percepcionIVA) || 0, parseFloat(it.percepcionIIBB) || 0, parseFloat(it.percepcionGanancias) || 0,
-        data.comprobante || '', it.notas || data.notas || ''];
-    });
+    var rows = _cmpFilas(data, items);
     if (data.aPlazo && !String(data.proveedor || '').trim()) return { ok: false, msg: 'Para cargar una compra a plazo elegí el proveedor' };
     var refsViejas = _ccRefsCompra(sheet, val.filas);
     // Primero se agregan las líneas nuevas y después se borran las viejas: si algo falla en el medio, no se pierde la compra.
     var primera = sheet.getLastRow() + 1;
     sheet.getRange(primera, 1, rows.length, rows[0].length).setValues(rows);
+    _cmpMarcarTipo(sheet, primera, rows.length, data.tipoComprobante);
     if (data.aPlazo) _ccMarcarCompra(sheet, primera, rows.length, _ccCompraAPlazo(data, rows));
     _cmpBorrarFilas(sheet, val.filas);
     refsViejas.forEach(function(r) { _ccBorrarPorOrigen('COMPRA:' + r); });
@@ -2021,8 +2077,10 @@ function _ccCompraAPlazo(data, rows) {
   if (!prov) throw new Error('Para cargar una compra a plazo elegí el proveedor');
   var total = rows.reduce(function(s, r) { return s + (parseFloat(r[9]) || 0); }, 0);
   var ref = _ccId('C');
-  _ccAgregar({ fecha: data.fecha, tipo: 'PROVEEDOR', tercero: prov, concepto: 'COMPRA', comprobante: data.comprobante || '',
-               debe: 0, haber: total, vencimiento: data.vencimiento, origen: 'COMPRA:' + ref, notas: '' });
+  // Factura / nota de débito: aumenta la deuda (haber). Nota de crédito: total negativo, la disminuye (debe).
+  var comp = [data.tipoComprobante || '', data.comprobante || ''].join(' ').trim();
+  _ccAgregar({ fecha: data.fecha, tipo: 'PROVEEDOR', tercero: prov, concepto: 'COMPRA', comprobante: comp,
+               debe: total < 0 ? -total : 0, haber: total < 0 ? 0 : total, vencimiento: data.vencimiento, origen: 'COMPRA:' + ref, notas: '' });
   return { ref: ref, venc: _ccFecha(data.vencimiento) || '' };
 }
 function _ccMarcarCompra(sheet, primeraFila, n, cc) {
